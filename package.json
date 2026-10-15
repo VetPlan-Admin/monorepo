@@ -1,0 +1,16 @@
+{
+  "name": "@vet-plan/monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.26.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "migration:run": "pnpm --filter @vet-plan/backend migration:run"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}
