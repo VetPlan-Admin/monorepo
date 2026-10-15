@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment and Secrets
+.env
+.env.*
+!.env.example
+
+# Next.js build outputs
+apps/frontend/.next/
+apps/frontend/out/
+
+# NestJS build outputs
+apps/backend/dist/
+
+# IDE / System files
+.vscode/
+.idea/
+.DS_Store
+*.log
