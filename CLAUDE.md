@@ -29,3 +29,50 @@
 ## 5. Security Restrictions
 - NEVER commit secrets or `.env` files.
 - ALWAYS maintain strict `.gitignore` rules for `node_modules` and `.pnpm-store`.
+
+## 6. Monorepo Directory Structure & File Blueprint
+vetplan-monorepo/
+├── apps/
+│   ├── frontend/                   # Next.js 14 App Router
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── (auth)/         # Login / Social Auth Routes
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── (dashboard)/    # Main Surgical Planning Workspace
+│   │   │   │   │   ├── cases/      # Surgical Cases List & Detail
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── components/         # Reusable UI & DICOM Canvas Components
+│   │   │   │   ├── canvas/         # DICOM Viewer & Angle Measuring Tools
+│   │   │   │   └── ui/             # High-Contrast Buttons, Cards, Inputs
+│   │   │   └── lib/                # API Client, State, i18n Helpers
+│   │   ├── public/                 # Monogram Logos & Static Assets
+│   │   ├── next.config.mjs
+│   │   ├── tailwind.config.ts      # Brand Colors (#3B0764 & #FEF08A)
+│   │   └── package.json
+│   │
+│   └── backend/                    # NestJS REST API & Microservices
+│       ├── src/
+│       │   ├── modules/
+│       │   │   ├── auth/           # Passport Social Logins & JWT Guards
+│       │   │   ├── cases/          # Orthopedic Surgical Cases & Measurements
+│       │   │   ├── ai-bot/         # Gemini 2.5 Flash Triage & Telegram Webhook
+│       │   │   └── telemetry/      # OpenTelemetry & Prometheus /metrics
+│       │   ├── config/             # TypeORM, Neon Postgres, & Redis Setup
+│       │   ├── app.module.ts
+│       │   ├── tracing.ts          # OpenTelemetry Exporter Initialization
+│       │   └── main.ts
+│       ├── test/
+│       └── package.json
+│
+├── packages/                       # Shared Internal Workspace Packages
+│   ├── shared/                     # Shared DTOs, Interfaces, & Constants
+│   └── config/                     # Shared ESLint, TS, Prettier Configs
+│
+├── .gitignore                      # Strict Git exclusions
+├── CLAUDE.md                       # AI Agent Guidelines & Architecture Specs
+├── GEMINI.md                       # Symlink -> CLAUDE.md
+├── package.json                    # Root package manager & workspace scripts
+├── pnpm-workspace.yaml             # Monorepo packages & build rules
+└── turbo.json                      # Turborepo task pipeline execution
