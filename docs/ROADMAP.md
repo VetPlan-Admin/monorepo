@@ -31,15 +31,20 @@
 - [ ] Re-evaluate when NativeWind v5 goes stable (and ships a Next.js integration) or Solito supports Expo Router 58.
 
 ## Phase 3: Surgical Math Engine (`packages/shared`)
-- [ ] Create pure mathematical functions for TPLO angle calculation (MPTA, TPA).
-- [ ] Implement TTA cage size & advancement matrix algorithms.
-- [ ] Implement Norberg Angle calculation for canine hip dysplasia.
-- [ ] Write 100% test coverage with Vitest for edge cases and precision tolerances.
+Reference: `docs/SURGICAL_MATH.md`.
+- [x] Geometry core: orientation-independent angles, least-squares circle fit, pixel↔mm calibration (marker ball or known length).
+- [x] TPLO: `tibialPlateauAngle` (TPA), `mechanicalMedialProximalTibialAngle` (mMPTA), `tploRotationPlan` (rotation, chord, arc for a saw blade radius).
+- [x] TTA: `patellarTendonAngle`, `ttaAdvancement` (conventional linear model), `selectTtaCageSize`, `ttaAdvancementMatrix` (predicted PTA per cage).
+- [x] Norberg: `norbergAngle`, `bilateralNorbergAngles`, `isNorbergAngleWithinNormalLimits` (105° default).
+- [x] Vitest with enforced 100% coverage; every case re-tested under rotation/translation/scale/mirroring (57 tests).
+- [ ] Clinical validation: compare outputs with measurements by the surgical team on real radiographs.
+- [ ] Hinged TTA model (Modified Maquet / TTA Rapid): cage width at the cage level from the hinge position.
+- [ ] TPLO off-centre osteotomy: predict the achieved TPA when the cut isn't centred on the eminences.
 
 ## Phase 4: Web-Based DICOM Canvas & Overlay Engine
 - [ ] Build interactive DICOM image viewer component in `apps/frontend` (web-only, see ARCHITECTURE §4.4).
 - [ ] Implement high-contrast canvas drawing tools for point selection and line vectors.
-- [ ] Bind frontend surgical math calculations to real-time canvas overlays (`colors.brand.yellow` from `@vet-plan/tokens`).
+- [ ] Bind the `@vet-plan/shared` math (TPA, mMPTA, PTA/TTA, Norberg, calibration) to real-time canvas overlays (`colors.brand.yellow` from `@vet-plan/tokens`). Show `RangeError` messages instead of numbers for invalid landmarks.
 - [ ] *(Optional)* Mobile viewer with `@shopify/react-native-skia` sharing measurement state from `packages/app`.
 
 ## Phase 5: Surgical Case Management & Workflows

@@ -36,7 +36,7 @@ Next.js server components ──GET /auth/me (Bearer from cookie)──▶ Backe
 ## 2. Shared Workspace Packages
 | Package | Contents | May import |
 |---|---|---|
-| `@vet-plan/shared` | DTOs, Enums (`Role`, `Species`, `ProcedureType`), pure surgical math | nothing (no React) |
+| `@vet-plan/shared` | DTOs, Enums (`Role`, `Species`, `ProcedureType`, `OAuthProvider`), surgical math engine (§6) | nothing (no React) |
 | `@vet-plan/tokens` | Brand colors & design tokens; build emits `dist/theme.css` | nothing |
 | `@vet-plan/ui` | Cross-platform primitives (`Button`) + the web `react-native` shim | `tokens`, `react-native` |
 | `@vet-plan/app` | Screens, API client, `ApiProvider`, `NavigationProvider`/`Link` | `ui`, `shared`, `tokens`, `react-native` |
@@ -96,7 +96,7 @@ NativeWind v5 has no Next.js/Turbopack integration yet ("Other Bundlers: coming 
 | `solito` | **not used** | Solito 5.0.0 drives navigation through `@react-navigation/native`; Expo Router 58 replaced it with a vendored fork (no `getActionFromState`), so Solito links can't reach Expo Router's navigator. `NavigationProvider` + `Link` implement the same idea with no router dependency; revisit when Solito supports Expo Router 58. |
 
 ### 4.4 DICOM Canvas
-- The surgical math stays in `@vet-plan/shared` and runs on both platforms.
+- The surgical math stays in `@vet-plan/shared` (§6) and runs on both platforms. The canvas only collects landmark `Point2D`s in image pixels and renders the results.
 - The web viewer (`apps/frontend/src/components/canvas`) uses Canvas/WebGL and is web-only.
 - A mobile viewer, if needed, uses `@shopify/react-native-skia` in `apps/mobile`. Measurement *state* (points, lines, results) can still live in `packages/app`.
 
@@ -115,3 +115,11 @@ NativeWind v5 has no Next.js/Turbopack integration yet ("Other Bundlers: coming 
 - UUIDs use `gen_random_uuid()` (core Postgres 13+), so Neon needs no extensions.
 - **Local database without Docker:** `pnpm --filter @vet-plan/backend db:local` starts PGlite (real Postgres compiled to WASM) on `127.0.0.1:5432`, persisted in `apps/backend/.pglite/`. Use `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres`.
 - **Tests:** e2e tests boot the full `AppModule` against a throwaway in-memory PGlite with migrations applied (`test/utils/test-app.ts`). `NODE_ENV=test` makes `ConfigModule` ignore `.env`, so tests never touch Neon or real credentials.
+
+## 6. Surgical Math Engine
+Full reference: `docs/SURGICAL_MATH.md`.
+- Lives in `packages/shared/src/math/` (`geometry`, `calibration`, `tplo`, `tta`, `norberg`). It is pure TypeScript with no React, DOM, or Node APIs, so the backend, web, and mobile all run identical code.
+- Inputs are landmark points in **image pixels**, in any orientation. Outputs are degrees and millimetres (via `Calibration`). Results don't depend on image rotation or mirroring (left/right limb).
+- Invalid landmarks throw `RangeError` with a human-readable message. Callers must surface it, never substitute a default.
+- Clinical defaults are exported constants and overridable parameters: `DEFAULT_TPLO_TARGET_PLATEAU_ANGLE` (5°), `DEFAULT_TTA_TARGET_TENDON_ANGLE` (90°), `DEFAULT_TTA_CAGE_SIZES_MM` (3–15 mm), `NORBERG_NORMAL_THRESHOLD_DEGREES` (105°).
+- Coverage is enforced at 100% (`packages/shared/vitest.config.ts`). A formula change requires matching tests and an update to `docs/SURGICAL_MATH.md`.
