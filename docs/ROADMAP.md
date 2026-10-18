@@ -42,13 +42,22 @@ Reference: `docs/SURGICAL_MATH.md`.
 - [ ] TPLO off-centre osteotomy: predict the achieved TPA when the cut isn't centred on the eminences.
 
 ## Phase 4: Web-Based DICOM Canvas & Overlay Engine
-- [ ] Build interactive DICOM image viewer component in `apps/frontend` (web-only, see ARCHITECTURE §4.4).
-- [ ] Implement high-contrast canvas drawing tools for point selection and line vectors.
-- [ ] Bind the `@vet-plan/shared` math (TPA, mMPTA, PTA/TTA, Norberg, calibration) to real-time canvas overlays (`colors.brand.yellow` from `@vet-plan/tokens`). Show `RangeError` messages instead of numbers for invalid landmarks.
-- [ ] *(Optional)* Mobile viewer with `@shopify/react-native-skia` sharing measurement state from `packages/app`.
+Reference: ARCHITECTURE §7, SURGICAL_MATH §3.
+- [x] Interactive radiograph viewer at `/planner` (`apps/frontend/src/components/canvas/`): DICOM uncompressed (implicit/explicit VR LE), JPEG Lossless (.57/.70) and JPEG Baseline; PNG/JPEG/WebP. Window/level, pan, cursor-anchored zoom, fit. Everything runs in the browser; nothing is uploaded.
+- [x] High-contrast canvas tools: guided landmark placement (prompt per step), draggable handles, undo (Backspace), distance and angle-between-lines tools, outlined yellow strokes and purple labels from `@vet-plan/tokens`.
+- [x] Measurement protocols in `@vet-plan/shared` (`evaluateMeasurement`) bind TPA + TPLO plan, mMPTA, TTA (advancement, cage, predicted PTA), Norberg and calibration (marker ball, known length, DICOM spacing) to live overlays. Invalid landmarks show the `RangeError` message instead of numbers.
+- [x] Tests: protocols at 100% coverage; frontend Vitest for DICOM decoding (synthetic files + a real JPEG Lossless sample), windowing, viewport and planner state; headless-Chrome run of the production build (calibrate → TPA → distance → drag → undo).
+- [x] `/planner` and `/cases` require a session cookie (`src/proxy.ts`, optimistic check).
+- [ ] *(Optional)* Mobile viewer with `@shopify/react-native-skia` reusing the shared protocols.
+- [ ] More DICOM compressions (JPEG 2000, JPEG-LS, RLE, deflate) via WASM codecs. Weigh bundle size; load on demand.
+- [ ] Export an annotated PNG / planning report.
+- [ ] Two-finger pinch zoom on tablets (single-pointer pan/place works today).
+- [ ] Translate protocol labels and prompts (next-intl); they're English strings in `@vet-plan/shared` today.
+- [ ] Keep labels from covering handles (collision-aware label placement).
 
 ## Phase 5: Surgical Case Management & Workflows
 - [ ] Build Patient & Surgical Case REST endpoints with RBAC protection (`@Roles` on every handler; DTOs in `@vet-plan/shared`).
+- [ ] Save planner measurements with the case: `{ type, points, parameters }` per measurement (image pixels) + image dimensions + calibration source. The backend recomputes values with `evaluateMeasurement`; never trust client-computed numbers. Decide whether radiographs are stored (cost/privacy) or only landmarks.
 - [ ] Create case history screens in `packages/app` (search, filter, procedure status badges), routed on web and mobile.
 - [ ] Add JSON metadata export for surgical planning reports.
 

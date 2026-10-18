@@ -6,3 +6,4 @@ export * from './dtos/auth.dto.js';
 export * from './dtos/health.dto.js';
 export * from './dtos/create-case.dto.js';
 export * from './math/index.js';
+export * from './measurements/index.js';

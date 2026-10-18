@@ -37,6 +37,12 @@ async function SessionPanel() {
         Signed in as <strong>{user.displayName}</strong> · {role}
         {user.tenant ? ` · ${user.tenant.name}` : ""}
       </p>
+      <Link
+        href="/planner"
+        className="rounded-full bg-brand-yellow px-6 py-3 font-semibold text-brand-purple transition-opacity hover:opacity-90"
+      >
+        Open surgical planner
+      </Link>
       <form action="/auth/logout" method="post">
         <button
           type="submit"

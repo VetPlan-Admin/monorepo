@@ -23,7 +23,7 @@
 - **Dev Mode:** `pnpm dev` (or a single app: `pnpm --filter @vet-plan/frontend dev`, `pnpm --filter @vet-plan/mobile dev` → scan the QR code with Expo Go)
 - **Typecheck All:** `pnpm typecheck` (`pnpm lint` also type-checks mobile and the shared UI packages)
 - **Lint All:** `pnpm lint`
-- **Test All:** `pnpm test` (backend e2e: `pnpm --filter @vet-plan/backend test:e2e`; surgical math with coverage: `pnpm --filter @vet-plan/shared test`)
+- **Test All:** `pnpm test` (backend e2e: `pnpm --filter @vet-plan/backend test:e2e`; surgical math with coverage: `pnpm --filter @vet-plan/shared test`; planner modules: `pnpm --filter @vet-plan/frontend test`)
 - **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (also `migration:generate src/migrations/<Name>`, `migration:revert`, `migration:show`). Register new migrations in `src/config/database.config.ts`.
 - **Local Postgres (no Docker):** `pnpm --filter @vet-plan/backend db:local` (PGlite on `127.0.0.1:5432`)
 - **Ports:** frontend `3000`, backend `4000` (`APP_URL` / `API_URL` in `.env`), Expo dev server `8081`
@@ -35,6 +35,8 @@
 - **Backend Auth:** Social login via Passport (Google, LinkedIn OIDC, Facebook) + JWT. `JwtAuthGuard` and `RolesGuard` are global and deny by default: every route MUST declare `@Roles(...)` or `@Public()`. Do NOT add `@UseGuards(JwtAuthGuard, RolesGuard)` to controllers. Read the caller with `@CurrentUser()` and scope tenant data by its `tenantId`. Flow: `docs/ARCHITECTURE.md` §1.1.
 - **Frontend Auth:** the access token lives only in the HTTP-only `vp_session` cookie. Read the user with `getCurrentUser()` from `src/lib/session.ts` inside a `<Suspense>` boundary (Cache Components). Never expose the token to client components.
 - **Surgical Math:** all clinical measurements live in `packages/shared/src/math/` and nowhere else (no angle maths in components or services). Inputs are image-pixel `Point2D` landmarks, outputs degrees/mm; invalid input throws `RangeError`. Coverage MUST stay at 100%, and formula or default changes MUST update `docs/SURGICAL_MATH.md`.
+- **Measurements in UIs:** canvases and screens call `evaluateMeasurement` from `@vet-plan/shared` and render its overlay/values; they never compute clinical values themselves. A new measurement = a protocol definition in `packages/shared/src/measurements/definitions.ts` + tests + a row in `docs/SURGICAL_MATH.md` §3.
+- **Radiograph Privacy:** the planner reads files in the browser and uploads nothing. Any feature that sends images or patient metadata to the backend needs an explicit decision recorded in `docs/ARCHITECTURE.md`.
 - **Cross-Platform Code:** `packages/ui` and `packages/app` MUST NOT import from `next/*`, `expo-*`, or app folders. Write React Native primitives (`View`, `Text`, `Pressable`) with `className`; navigate with `Link` from `@vet-plan/app`; call the backend with `useApiClient()`. Shared files must start with `'use client'`. Exactly one React (19.3.0) and React Native (0.88.0) version in the repo. Rules in `docs/ARCHITECTURE.md` §4.
 - **Telemetry:** Expose OpenTelemetry metrics via `/metrics` on NestJS; do NOT introduce proprietary paid SaaS SDKs.
 - **Git Commit Style:** Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`).
@@ -57,18 +59,29 @@ vetplan-monorepo/
 │   │   │   │   ├── auth/
 │   │   │   │   │   ├── callback/route.ts # Exchanges code → sets HTTP-only vp_session cookie
 │   │   │   │   │   └── logout/route.ts   # POST: clears the cookie
-│   │   │   │   ├── (dashboard)/    # Main Surgical Planning Workspace
-│   │   │   │   │   └── cases/page.tsx   # Thin route → CasesScreen from @vet-plan/app
+│   │   │   │   ├── (dashboard)/    # Main Surgical Planning Workspace (session required, see proxy.ts)
+│   │   │   │   │   ├── cases/page.tsx   # Thin route → CasesScreen from @vet-plan/app
+│   │   │   │   │   └── planner/page.tsx # Radiograph planner (web-only)
 │   │   │   │   ├── globals.css     # Tailwind layers + tokens + @source for shared packages
 │   │   │   │   ├── layout.tsx      # StylesProvider, ApiProvider, WebNavigationProvider
 │   │   │   │   ├── navigation-provider.tsx  # Injects next/link into @vet-plan/app's Link
 │   │   │   │   ├── styles-provider.tsx      # SSR react-native-web styles (lowest CSS layer)
 │   │   │   │   └── page.tsx        # HomeScreen from @vet-plan/app + web session panel
 │   │   │   ├── components/
-│   │   │   │   └── canvas/         # (planned) Web-only DICOM Viewer & Angle Measuring Tools
-│   │   │   └── lib/
-│   │   │       ├── api.ts          # Server-only backend URL
-│   │   │       └── session.ts      # getCurrentUser() ('use cache: private')
+│   │   │   │   └── canvas/         # Radiograph planner (web-only, ARCHITECTURE §7)
+│   │   │   │       ├── image/      # DICOM/raster loading, windowing (+ *.test.ts)
+│   │   │   │       ├── planner-state.ts     # Pure reducer, calibration resolution
+│   │   │   │       ├── viewport.ts          # image ↔ screen transforms
+│   │   │   │       ├── overlay-renderer.ts  # High-contrast drawing of protocol overlays
+│   │   │   │       ├── planner-canvas.tsx   # Canvas + pointer/keyboard interaction
+│   │   │   │       ├── radiograph-planner.tsx, measurement-card.tsx
+│   │   │   │       └── __fixtures__/        # DICOM writer + real JPEG Lossless sample
+│   │   │   ├── lib/
+│   │   │   │   ├── api.ts          # Server-only backend URL
+│   │   │   │   ├── session.ts      # getCurrentUser() ('use cache: private')
+│   │   │   │   └── session-cookie.ts  # Cookie name shared with proxy.ts
+│   │   │   ├── proxy.ts            # Redirects /planner, /cases to /login without a session
+│   │   │   └── types/              # Ambient declarations (jpeg-lossless-decoder-js)
 │   │   ├── public/                 # Monogram Logos & Static Assets
 │   │   ├── next.config.ts          # react-native → @vet-plan/ui shim alias, transpilePackages
 │   │   └── package.json
@@ -104,7 +117,9 @@ vetplan-monorepo/
 │
 ├── packages/                       # Shared Internal Workspace Packages
 │   ├── shared/                     # DTOs, Enums (Role…), surgical math engine. No React.
-│   │   └── src/math/               # geometry, calibration, tplo, tta, norberg (+ specs, __fixtures__)
+│   │   └── src/
+│   │       ├── math/               # geometry, calibration, tplo, tta, norberg (+ specs, __fixtures__)
+│   │       └── measurements/       # Protocols: landmarks, parameters, evaluateMeasurement
 │   ├── tokens/                     # Design tokens (TS + generated Tailwind theme.css)
 │   ├── ui/                         # Cross-platform primitives (Button) + web react-native shim
 │   ├── app/                        # Cross-platform screens, API client, ApiProvider, Link

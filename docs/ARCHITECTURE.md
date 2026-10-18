@@ -36,7 +36,7 @@ Next.js server components ──GET /auth/me (Bearer from cookie)──▶ Backe
 ## 2. Shared Workspace Packages
 | Package | Contents | May import |
 |---|---|---|
-| `@vet-plan/shared` | DTOs, Enums (`Role`, `Species`, `ProcedureType`, `OAuthProvider`), surgical math engine (§6) | nothing (no React) |
+| `@vet-plan/shared` | DTOs, Enums (`Role`, `Species`, `ProcedureType`, `OAuthProvider`), surgical math engine + measurement protocols (§6) | nothing (no React) |
 | `@vet-plan/tokens` | Brand colors & design tokens; build emits `dist/theme.css` | nothing |
 | `@vet-plan/ui` | Cross-platform primitives (`Button`) + the web `react-native` shim | `tokens`, `react-native` |
 | `@vet-plan/app` | Screens, API client, `ApiProvider`, `NavigationProvider`/`Link` | `ui`, `shared`, `tokens`, `react-native` |
@@ -95,10 +95,9 @@ NativeWind v5 has no Next.js/Turbopack integration yet ("Other Bundlers: coming 
 | `react-native-web` | 0.21.x | Renders `packages/ui` / `packages/app` in Next.js |
 | `solito` | **not used** | Solito 5.0.0 drives navigation through `@react-navigation/native`; Expo Router 58 replaced it with a vendored fork (no `getActionFromState`), so Solito links can't reach Expo Router's navigator. `NavigationProvider` + `Link` implement the same idea with no router dependency; revisit when Solito supports Expo Router 58. |
 
-### 4.4 DICOM Canvas
-- The surgical math stays in `@vet-plan/shared` (§6) and runs on both platforms. The canvas only collects landmark `Point2D`s in image pixels and renders the results.
-- The web viewer (`apps/frontend/src/components/canvas`) uses Canvas/WebGL and is web-only.
-- A mobile viewer, if needed, uses `@shopify/react-native-skia` in `apps/mobile`. Measurement *state* (points, lines, results) can still live in `packages/app`.
+### 4.4 Radiograph Canvas
+- The web planner (§7) is web-only (`apps/frontend/src/components/canvas`, HTML canvas).
+- All clinical logic lives in `@vet-plan/shared` (math + measurement protocols, §6), so a mobile viewer (`@shopify/react-native-skia` in `apps/mobile`) would only reimplement image loading, drawing and gestures.
 
 ## 5. Data Model & Migrations
 | Table | Key columns | Notes |
@@ -122,4 +121,23 @@ Full reference: `docs/SURGICAL_MATH.md`.
 - Inputs are landmark points in **image pixels**, in any orientation. Outputs are degrees and millimetres (via `Calibration`). Results don't depend on image rotation or mirroring (left/right limb).
 - Invalid landmarks throw `RangeError` with a human-readable message. Callers must surface it, never substitute a default.
 - Clinical defaults are exported constants and overridable parameters: `DEFAULT_TPLO_TARGET_PLATEAU_ANGLE` (5°), `DEFAULT_TTA_TARGET_TENDON_ANGLE` (90°), `DEFAULT_TTA_CAGE_SIZES_MM` (3–15 mm), `NORBERG_NORMAL_THRESHOLD_DEGREES` (105°).
-- Coverage is enforced at 100% (`packages/shared/vitest.config.ts`). A formula change requires matching tests and an update to `docs/SURGICAL_MATH.md`.
+- **Measurement protocols** (`packages/shared/src/measurements/`) describe each measurement: ordered landmarks with prompts, parameters with ranges, construction lines, and a `compute` built on the math. `evaluateMeasurement(type, points, parameters, calibration)` returns `incomplete` (next landmark + partial overlay), `complete` (values, warnings, overlay shapes, optional calibration) or `invalid` (message). UIs render protocols generically; adding a measurement means adding a definition, not UI code.
+- Coverage is enforced at 100% for `math/` and `measurements/` (`packages/shared/vitest.config.ts`). A formula change requires matching tests and an update to `docs/SURGICAL_MATH.md`.
+
+## 7. Radiograph Planner (web)
+Route `/planner` (`apps/frontend/src/app/(dashboard)/planner/page.tsx`) → `RadiographPlanner` (client component).
+
+```
+File ──loadRadiograph──▶ RadiographImage ──renderWindowed──▶ offscreen canvas ──viewport──▶ <canvas>
+       (DICOM: dicom-parser + jpeg-lossless-decoder-js;      (Float32 modality values,        ▲
+        PNG/JPEG/WebP and JPEG-baseline DICOM: browser)        window/level, MONOCHROME1)     │ overlay shapes
+plannerReducer (pure) ──points/parameters──▶ evaluateMeasurement (@vet-plan/shared) ──────────┘ + results panel
+```
+- **Privacy:** files are read with `File.arrayBuffer()` and never uploaded. Persisting anything is a Phase 5 decision.
+- **Formats:** DICOM Part 10, first frame, single channel: uncompressed implicit/explicit VR little endian (8/16-bit, signed or unsigned, BitsStored masking), JPEG Lossless (`1.2.840.10008.1.2.4.57`, `.70`), JPEG Baseline (`.50`, decoded by the browser). Other transfer syntaxes and colour DICOM fail with an actionable `ImageLoadError` message. PNG/JPEG/WebP are converted to luminance.
+- **Calibration priority** (`resolveCalibration`): latest complete calibration measurement (marker ball / known length) → DICOM `PixelSpacing` → `ImagerPixelSpacing` (with a magnification warning) → none (angles only; mm values withheld with a warning).
+- **Coordinates:** landmarks are stored in image pixels; `viewport.ts` maps image ↔ screen (`screen = image × scale + offset`). Overlays are drawn in screen space so stroke widths stay constant at any zoom.
+- **Interaction:** click places the next landmark; press-and-drag moves a handle (a click without movement still places a point); drag pans; wheel zooms at the cursor; right-drag adjusts window/level; Backspace undoes; F fits; +/− zoom. Pointer events, so mouse, pen and single-finger touch work.
+- **Rendering:** strokes are drawn twice (dark outline under brand-yellow/white), labels on brand-purple tags, inactive measurements at 55% opacity.
+- **Testing:** pure modules (`image/dicom.ts`, `image/windowing.ts`, `viewport.ts`, `planner-state.ts`) have Vitest specs (`pnpm --filter @vet-plan/frontend test`), including a real JPEG Lossless sample in `__fixtures__/`. React/canvas code is verified in a real browser.
+- **Access:** `src/proxy.ts` redirects `/planner` and `/cases` to `/login` without a `vp_session` cookie (optimistic UX check; the backend validates tokens on every API call).

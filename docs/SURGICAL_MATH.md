@@ -69,7 +69,30 @@ TTA Rapid) advance by rotation about a distal hinge and need their own correctio
 | `bilateralNorbergAngles(left, right)` | Both hips | `{ left, right }` |
 | `isNorbergAngleWithinNormalLimits(angle, threshold = 105)` | Angle | Screening flag only. Grading schemes (e.g. FCI) also weigh congruency and degenerative changes |
 
-## 3. Example
+## 3. Measurement protocols (`src/measurements/`)
+`evaluateMeasurement(type, points, parameters?, calibration?)` wraps the functions above for UIs and
+the backend. Points are `Record<landmarkKey, Point2D[]>` in image pixels; outlines take 3 points
+(fitted with `fitCircle`). Results: `incomplete` (next landmark + construction overlay), `complete`
+(values, warnings, overlay, optional calibration) or `invalid` (message; never throws for clinical
+input). Optional steps that fail (e.g. no cage large enough) become **warnings**, not errors.
+
+| Type | Landmarks (placement order) | Parameters (default, range) | Values |
+|---|---|---|---|
+| `TIBIAL_PLATEAU_ANGLE` | caudal plateau, cranial plateau, eminences, talus | target TPA (5°, 0–15), saw blade radius (24 mm, 5–40) | TPA, rotation, rotation chord |
+| `MEDIAL_PROXIMAL_TIBIAL_ANGLE` | lateral plateau, medial plateau, proximal axis, distal axis | — | mMPTA |
+| `TTA_ADVANCEMENT` | reference caudal, reference cranial, tendon origin (patella), tendon insertion | target tendon angle (90°, 80–100) | PTA; with calibration: advancement, cage, predicted PTA |
+| `NORBERG_ANGLE` | right head outline (3), right rim, left head outline (3), left rim | normal threshold (105°, 90–115) | right/left NA with within/outside-limits assessment |
+| `CALIBRATION_MARKER` | marker outline (3) | marker diameter (25 mm) | mm/px (sets calibration) |
+| `CALIBRATION_LENGTH` | start, end | known length (100 mm) | mm/px (sets calibration) |
+| `DISTANCE` | start, end | — | px, or mm when calibrated |
+| `ANGLE_BETWEEN_LINES` | line 1 start/end, line 2 start/end | — | acute angle between the lines |
+
+Overlay shapes (`segment`, `arrow`, `circle`, `label`) carry an emphasis: `primary` (measured
+lines), `secondary` (axes, fitted outlines), `guide` (reference/planned lines, drawn dashed). The
+TTA guide shows the planned tendon line and the advancement arrow; the TPA guide shows the
+perpendicular to the functional axis.
+
+## 4. Example
 ```ts
 import {
   calibrationFromMarker, fitCircle, selectTtaCageSize, tibialPlateauAngle,
@@ -86,16 +109,16 @@ const { requiredAdvancementMm } = ttaAdvancement({
 const cage = selectTtaCageSize(requiredAdvancementMm);
 ```
 
-## 4. Testing rules
+## 5. Testing rules
 - `pnpm --filter @vet-plan/shared test` runs Vitest with **100% line/branch/function/statement
-  thresholds** on `src/math/**`. The run fails below 100%.
+  thresholds** on `src/math/**` and `src/measurements/**`. The run fails below 100%.
 - Each clinical function is tested from a known geometric construction (landmarks built from a
   known angle) and under the transforms in `src/math/__fixtures__/transforms.ts`. Tolerances are
   at least 1e-9° and 1e-9 mm.
 - Specs and fixtures are excluded from the package build (`tsconfig.build.json`).
 - Changing a formula or a clinical default means updating this document and the tests together.
 
-## 5. References
+## 6. References
 - Slocum B, Slocum TD. Tibial plateau leveling osteotomy for repair of cranial cruciate ligament
   rupture in the canine. *Vet Clin North Am Small Anim Pract*, 1993.
 - Dismukes DI et al. Determination of pelvic limb alignment in the large-breed dog: a cadaveric

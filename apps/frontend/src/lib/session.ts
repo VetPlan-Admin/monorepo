@@ -3,9 +3,9 @@ import { cacheLife } from "next/cache";
 import { cookies } from "next/headers";
 import type { CurrentUserDto } from "@vet-plan/shared";
 import { API_URL } from "./api";
+import { SESSION_COOKIE } from "./session-cookie";
 
-/** HTTP-only cookie holding the backend access token (set by /auth/callback). */
-export const SESSION_COOKIE = "vp_session";
+export { SESSION_COOKIE };
 
 /**
  * The signed-in user, or null. Reads the session cookie at request time,
