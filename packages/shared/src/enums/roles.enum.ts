@@ -4,3 +4,5 @@ export enum Role {
     VETERINARIAN = 'VETERINARIAN',
     ASSISTANT = 'ASSISTANT',
 }
+
+export const ALL_ROLES: readonly Role[] = Object.values(Role);

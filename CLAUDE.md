@@ -23,12 +23,15 @@
 - **Dev Mode:** `pnpm dev` (or a single app: `pnpm --filter @vet-plan/frontend dev`)
 - **Lint All:** `pnpm lint`
 - **Test All:** `pnpm test` (backend e2e: `pnpm --filter @vet-plan/backend test:e2e`)
-- **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (script not yet defined; arrives with the TypeORM data source in Phase 1)
+- **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (also `migration:generate src/migrations/<Name>`, `migration:revert`, `migration:show`). Register new migrations in `src/config/database.config.ts`.
+- **Local Postgres (no Docker):** `pnpm --filter @vet-plan/backend db:local` (PGlite on `127.0.0.1:5432`)
+- **Ports:** frontend `3000`, backend `4000` (`APP_URL` / `API_URL` in `.env`)
 
 ## 4. Coding Standards & Governance
 - **TypeScript:** Strict mode enabled. No `any` casts without explicit justification.
 - **ESM Imports:** `apps/backend`, `packages/shared`, and `packages/tokens` compile with `nodenext`. Relative imports MUST end in `.js` (`./cases.module.js`). Package imports NEVER get an extension (`@vet-plan/shared`, not `@vet-plan/shared.js`). Next.js and Expo code uses bundler resolution and needs no extensions.
-- **Backend Auth:** Social login via Passport (Google, LinkedIn, Facebook) + JWT. `JwtAuthGuard` and `RolesGuard` are global and deny by default: every route MUST declare `@Roles(...)` or `@Public()`. Do NOT add `@UseGuards` to controllers.
+- **Backend Auth:** Social login via Passport (Google, LinkedIn OIDC, Facebook) + JWT. `JwtAuthGuard` and `RolesGuard` are global and deny by default: every route MUST declare `@Roles(...)` or `@Public()`. Do NOT add `@UseGuards(JwtAuthGuard, RolesGuard)` to controllers. Read the caller with `@CurrentUser()` and scope tenant data by its `tenantId`. Flow: `docs/ARCHITECTURE.md` §1.1.
+- **Frontend Auth:** the access token lives only in the HTTP-only `vp_session` cookie. Read the user with `getCurrentUser()` from `src/lib/session.ts` inside a `<Suspense>` boundary (Cache Components). Never expose the token to client components.
 - **Cross-Platform Code:** `packages/ui` and `packages/app` MUST NOT import from `next/*`, `expo-*`, or app folders. Use `solito/navigation` and `solito/link` for routing. Rules in `docs/ARCHITECTURE.md` §4.
 - **Telemetry:** Expose OpenTelemetry metrics via `/metrics` on NestJS; do NOT introduce proprietary paid SaaS SDKs.
 - **Git Commit Style:** Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`).
@@ -45,17 +48,22 @@ vetplan-monorepo/
 │   ├── frontend/                   # Next.js 16 App Router (web)
 │   │   ├── src/
 │   │   │   ├── app/
-│   │   │   │   ├── (auth)/         # Login / Social Auth Routes
-│   │   │   │   │   └── page.tsx
-│   │   │   │   ├── (dashboard)/    # Main Surgical Planning Workspace
-│   │   │   │   │   ├── cases/      # Thin route files rendering screens from @vet-plan/app
-│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── (auth)/         # Login layout (brand purple)
+│   │   │   │   │   ├── layout.tsx
+│   │   │   │   │   └── login/page.tsx   # Social login buttons → backend /auth/oauth/:provider
+│   │   │   │   ├── auth/
+│   │   │   │   │   ├── callback/route.ts # Exchanges code → sets HTTP-only vp_session cookie
+│   │   │   │   │   └── logout/route.ts   # POST: clears the cookie
+│   │   │   │   ├── (dashboard)/    # (planned) Main Surgical Planning Workspace
+│   │   │   │   │   └── cases/      # Thin route files rendering screens from @vet-plan/app
 │   │   │   │   ├── globals.css     # Imports @vet-plan/tokens/theme.css
 │   │   │   │   ├── layout.tsx
-│   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx        # Placeholder home showing the session
 │   │   │   ├── components/
-│   │   │   │   └── canvas/         # Web-only DICOM Viewer & Angle Measuring Tools
-│   │   │   └── lib/                # Web-only helpers (next-intl config, cookies)
+│   │   │   │   └── canvas/         # (planned) Web-only DICOM Viewer & Angle Measuring Tools
+│   │   │   └── lib/
+│   │   │       ├── api.ts          # Server-only backend URL
+│   │   │       └── session.ts      # getCurrentUser() ('use cache: private')
 │   │   ├── public/                 # Monogram Logos & Static Assets
 │   │   ├── next.config.ts
 │   │   └── package.json
@@ -66,15 +74,20 @@ vetplan-monorepo/
 │   └── backend/                    # NestJS REST API & Microservices
 │       ├── src/
 │       │   ├── modules/
-│       │   │   ├── auth/           # Passport Social Logins, JWT Strategy & Global Guards
+│       │   │   ├── auth/           # Controller, AuthService, strategies (jwt, google, linkedin, facebook),
+│       │   │   │                   # guards (global JWT + Roles, OAuthGuard), decorators, filters
+│       │   │   ├── users/          # User & OAuthAccount entities, UsersService (sign-in resolution)
+│       │   │   ├── tenants/        # Tenant entity (clinic)
 │       │   │   ├── cases/          # Orthopedic Surgical Cases & Measurements
-│       │   │   ├── ai-bot/         # Gemini 2.5 Flash Triage & Telegram Webhook
-│       │   │   └── telemetry/      # OpenTelemetry & Prometheus /metrics
-│       │   ├── config/             # TypeORM, Neon Postgres, & Redis Setup
+│       │   │   ├── ai-bot/         # (planned) Gemini 2.5 Flash Triage & Telegram Webhook
+│       │   │   └── telemetry/      # (planned) OpenTelemetry & Prometheus /metrics
+│       │   ├── config/             # database.config.ts (entities, migrations) + data-source.ts (CLI)
+│       │   ├── migrations/         # TypeORM migrations (registered in database.config.ts)
 │       │   ├── app.module.ts
-│       │   ├── tracing.ts          # OpenTelemetry Exporter Initialization
+│       │   ├── app.setup.ts        # Middleware shared by main.ts and e2e tests
+│       │   ├── tracing.ts          # (planned) OpenTelemetry Exporter Initialization
 │       │   └── main.ts
-│       ├── test/
+│       ├── test/                   # e2e specs + utils/test-app.ts (PGlite-backed AppModule)
 │       └── package.json
 │
 ├── packages/                       # Shared Internal Workspace Packages

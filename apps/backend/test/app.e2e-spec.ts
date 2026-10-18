@@ -1,80 +1,65 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { Role } from '@vet-plan/shared';
 import request from 'supertest';
-import { App } from 'supertest/types.js';
-import { AppModule } from './../src/app.module.js';
-
-process.env.JWT_SECRET ??= 'e2e-test-secret';
+import { createTestApp } from './utils/test-app.js';
+import type { TestContext } from './utils/test-app.js';
 
 describe('App (e2e)', () => {
-  let app: INestApplication<App>;
-  let jwtService: JwtService;
+  let ctx: TestContext;
 
-  const tokenFor = (role: Role) =>
-    jwtService.sign({ sub: 'user-1', tenantId: 'tenant-1', role });
+  beforeAll(async () => {
+    ctx = await createTestApp();
+  });
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
-    jwtService = moduleFixture.get(JwtService);
+  afterAll(async () => {
+    await ctx.close();
   });
 
   it('GET /health is public', () => {
-    return request(app.getHttpServer())
+    return request(ctx.app.getHttpServer())
       .get('/health')
       .expect(200)
       .expect({ status: 'ok' });
   });
 
   it('GET /cases rejects requests without a token', () => {
-    return request(app.getHttpServer()).get('/cases').expect(401);
+    return request(ctx.app.getHttpServer()).get('/cases').expect(401);
   });
 
   it('GET /cases allows a permitted role', () => {
-    return request(app.getHttpServer())
+    return request(ctx.app.getHttpServer())
       .get('/cases')
-      .set('Authorization', `Bearer ${tokenFor(Role.VETERINARIAN)}`)
+      .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.VETERINARIAN)}`)
       .expect(200)
       .expect([]);
   });
 
   it('GET /cases allows assistants', () => {
-    return request(app.getHttpServer())
+    return request(ctx.app.getHttpServer())
       .get('/cases')
-      .set('Authorization', `Bearer ${tokenFor(Role.ASSISTANT)}`)
+      .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.ASSISTANT)}`)
       .expect(200);
   });
 
   it('GET /cases forbids a role outside @Roles', () => {
-    return request(app.getHttpServer())
+    return request(ctx.app.getHttpServer())
       .get('/cases')
-      .set('Authorization', `Bearer ${tokenFor(Role.SUPER_ADMIN)}`)
+      .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.SUPER_ADMIN)}`)
       .expect(403);
   });
 
   it('POST /cases forbids assistants', () => {
-    return request(app.getHttpServer())
+    return request(ctx.app.getHttpServer())
       .post('/cases')
-      .set('Authorization', `Bearer ${tokenFor(Role.ASSISTANT)}`)
+      .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.ASSISTANT)}`)
       .send({})
       .expect(403);
   });
 
   it('POST /cases reaches the handler for veterinarians', () => {
-    return request(app.getHttpServer())
+    return request(ctx.app.getHttpServer())
       .post('/cases')
-      .set('Authorization', `Bearer ${tokenFor(Role.VETERINARIAN)}`)
+      .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.VETERINARIAN)}`)
       .send({})
       .expect(501);
-  });
-
-  afterEach(async () => {
-    await app.close();
   });
 });

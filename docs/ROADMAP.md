@@ -7,12 +7,16 @@
 - [ ] `packages/config`: shared TS base config (`tsconfig.base.json`), Prettier, ESLint presets.
 
 ## Phase 1: Authentication, Multi-Tenancy & RBAC
-- [ ] Implement `Tenant`, `User`, and `Role` entities in `@vet-plan/backend`.
-- [ ] Add TypeORM data source (`src/config/`) + `migration:run` script.
-- [ ] Configure Passport OAuth2 strategies (Google, LinkedIn, Facebook) + JWT issuing.
+- [x] Implement `Tenant`, `User`, and `OAuthAccount` entities in `@vet-plan/backend` (`Role` is a Postgres enum, see ARCHITECTURE §5).
+- [x] Add TypeORM data source (`src/config/`), initial migration, and `migration:*` scripts.
+- [x] Configure Passport OAuth2 strategies (Google, LinkedIn OpenID Connect, Facebook) + JWT issuing.
 - [x] Create `@Roles()` decorator and `RolesGuard` for controller authorization (global, deny-by-default).
-- [x] JWT strategy (`Authorization: Bearer`) with `{ sub, tenantId, role }` payload.
-- [ ] Build Next.js auth layout (`/app/(auth)/login/page.tsx`) and HTTP-only cookie session sync.
+- [x] JWT strategy (`Authorization: Bearer`) with `{ sub, tenantId, role, typ }` payload.
+- [x] Build Next.js auth layout (`/app/(auth)/login/page.tsx`) and HTTP-only cookie session sync.
+- [ ] **Your setup:** register OAuth apps and callback URLs, set `JWT_SECRET`, run `migration:run` on Neon (ARCHITECTURE §1.2).
+- [ ] Clinic invitations: let a `CLINIC_ADMIN` add `VETERINARIAN` / `ASSISTANT` users to their tenant (today every new sign-up creates its own clinic).
+- [ ] Refresh tokens or sliding sessions (access tokens currently last `JWT_EXPIRES_IN`, default 24h).
+- [ ] Make exchange codes single-use (store the code id in Upstash Redis); today they expire after 60s.
 
 ## Phase 2: Cross-Platform Frontend Foundation (Solito 5)
 Follow the READMEs in order. Each step should end with `pnpm build && pnpm lint` passing.

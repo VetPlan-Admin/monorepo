@@ -59,6 +59,9 @@ importers:
       '@willsoto/nestjs-prometheus':
         specifier: ^7.0.0
         version: 7.0.0(@nestjs/common@12.1.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@prometheus-io/client@0.16.1)
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -71,9 +74,9 @@ importers:
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
-      passport-linkedin-oauth2:
-        specifier: ^2.0.0
-        version: 2.0.0
+      passport-oauth2:
+        specifier: ^1.8.0
+        version: 1.8.0
       pg:
         specifier: ^8.23.1
         version: 8.23.1
@@ -90,6 +93,12 @@ importers:
         specifier: ^1.1.2
         version: 1.1.2(pg@8.23.1)(supports-color@7.2.0)
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.10
+        version: 0.5.10
+      '@electric-sql/pglite-socket':
+        specifier: ^0.2.13
+        version: 0.2.13(@electric-sql/pglite-age@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_hashids@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_ivm@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_textsearch@0.0.12(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_uuidv7@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pgtap@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pgvector@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite@0.5.10)
       '@nestjs/cli':
         specifier: ^12.0.0
         version: 12.0.8(@swc/core@1.16.18(@swc/helpers@0.5.23))(@types/node@24.19.2)(prettier@3.9.10)
@@ -102,15 +111,27 @@ importers:
       '@nestjs/testing':
         specifier: ^12.0.1
         version: 12.1.3(@nestjs/common@12.1.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.1.3)(@nestjs/platform-express@12.1.3)
+      '@types/cookie-parser':
+        specifier: ^1.4.10
+        version: 1.4.10(@types/express@5.0.6)
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.6
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
+      '@types/passport-facebook':
+        specifier: ^3.0.4
+        version: 3.0.4
+      '@types/passport-google-oauth20':
+        specifier: ^2.0.17
+        version: 2.0.17
       '@types/passport-jwt':
         specifier: ^4.0.1
         version: 4.0.1
+      '@types/passport-oauth2':
+        specifier: ^1.8.0
+        version: 1.8.0
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.1
@@ -144,6 +165,9 @@ importers:
 
   apps/frontend:
     dependencies:
+      '@vet-plan/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@vet-plan/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
@@ -314,6 +338,57 @@ packages:
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
+
+  '@electric-sql/pglite-age@0.0.11':
+    resolution: {integrity: sha512-SpgPLSAp6bz4jno7soLSIvu3HeOlgxAlyOL5r+AaAWYdBSdy9QzVGYbWz1YG+UaK40uppEviCkDZs/OCnby/mw==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_hashids@0.0.11':
+    resolution: {integrity: sha512-LCnIPhmeYsU6wBsxcS253pwoGn9FYGopjieq0rtcFjuV0KGoXMMhVI/wNVkDDp+UJlsWWx/4HDang9/0UDPj+A==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_ivm@0.0.11':
+    resolution: {integrity: sha512-hx9b0r7XOv7+s8BHYbQF8CnhRgrJtx3MsCmce0S94EWkLrc0oIDyespl/yg0bjXSjPoj0dXG9Pbpn1ScezutXg==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_textsearch@0.0.12':
+    resolution: {integrity: sha512-4w+XqCu0kVPOdpTTP1OERkJejqhjQ2NaFBGIpfR7VWaPaGYvReLgLISmblo4ik+MvIweO5obgwmwOe41AkQ6Jw==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_uuidv7@0.0.11':
+    resolution: {integrity: sha512-bMmPYmncxuDyBZDOFzrRa/nI4yYzHVNpE+vTD9lXVTM1V4C+G6N4hRoJbEnmycSlMbEIKbAlXT7CLPBZ/cswrQ==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pgtap@0.0.11':
+    resolution: {integrity: sha512-G9apu/VxUlt9k6if60YJ6FmJbM3mY6cEs11sIGEgaOfORRDAtT9oKSpXzyfDGga7QVZwFkiGY/Ez1BaX73OCew==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pgvector@0.0.11':
+    resolution: {integrity: sha512-pUukU2iqI5TLBv/0D5Bk9R9zVyms+7Do6yscl4WRKW5pD2wNl8FlzGWDXphXj/Q42SsVIJHbP4+oqwjQC9fasg==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-socket@0.2.13':
+    resolution: {integrity: sha512-z6kydnOvL5A4Y46bUQD3gZxi+cMJZFm700h9g+tMj11Z5rbhpozkFg2rK3Ln3BIjaHXkJogAR7UEj/qWtRBMKA==}
+    hasBin: true
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.10
+      '@electric-sql/pglite-age': 0.0.11
+      '@electric-sql/pglite-pg_hashids': 0.0.11
+      '@electric-sql/pglite-pg_ivm': 0.0.11
+      '@electric-sql/pglite-pg_textsearch': 0.0.12
+      '@electric-sql/pglite-pg_uuidv7': 0.0.11
+      '@electric-sql/pglite-pgtap': 0.0.11
+      '@electric-sql/pglite-pgvector': 0.0.11
+
+  '@electric-sql/pglite@0.5.10':
+    resolution: {integrity: sha512-tXc/25U3ulOkiRQuTFdwIv+JhBqtMdAF7Gvo6CfZZWtSB4+hgC4Wr2vwK5ngvvN5PJfAAEGIsfyCVy1JhCOBYw==}
 
   '@eloqnt/config@0.1.1':
     resolution: {integrity: sha512-YRDigSaiJEzKDfzTth5kG+L/PKfB3mo8h7yNzpXExPfvQmcD05WoZT57PdhJE0jI+Vva6eb0OCU8hnHHgdME3g==}
@@ -2123,6 +2198,11 @@ packages:
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
 
+  '@types/cookie-parser@1.4.10':
+    resolution: {integrity: sha512-B4xqkqfZ8Wek+rCOeRxsjMS9OgvzebEzzLYw7NHYuvzb7IdxOkI0ZHGgeEBX4PUM7QGVvNSK60T3OvWj3YfBRg==}
+    peerDependencies:
+      '@types/express': '*'
+
   '@types/cookiejar@2.1.5':
     resolution: {integrity: sha512-he+DHOWReW0nghN24E1WUqM0efK4kI9oTqDm6XmK8ZPe2djZ90BSNdGnIyCLzCPw7/pogPlGbzI2wHGGmi4O/Q==}
 
@@ -2165,8 +2245,20 @@ packages:
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
+  '@types/oauth@0.9.6':
+    resolution: {integrity: sha512-H9TRCVKBNOhZZmyHLqFt9drPM9l+ShWiqqJijU1B8P3DX3ub84NjxDuy+Hjrz+fEca5Kwip3qPMKNyiLgNJtIA==}
+
+  '@types/passport-facebook@3.0.4':
+    resolution: {integrity: sha512-dZ7/758O0b7s2EyRUZJ24X93k8Nncm5UXLQPYg9bBJNE5ZwvD314QfDFYl0i4DlIPLcYGWkJ5Et0DXt6DAk71A==}
+
+  '@types/passport-google-oauth20@2.0.17':
+    resolution: {integrity: sha512-MHNOd2l7gOTCn3iS+wInPQMiukliAUvMpODO3VlXxOiwNEMSyzV7UNvAdqxSN872o8OXx1SqPDVT6tLW74AtqQ==}
+
   '@types/passport-jwt@4.0.1':
     resolution: {integrity: sha512-Y0Ykz6nWP4jpxgEUYq8NoVZeCQPo1ZndJLfapI249g1jHChvRfZRO/LS3tqu26YgAS/laI1qx98sYGz0IalRXQ==}
+
+  '@types/passport-oauth2@1.8.0':
+    resolution: {integrity: sha512-6//z+4orIOy/g3zx17HyQ71GSRK4bs7Sb+zFasRoc2xzlv7ZCJ+vkDBYFci8U6HY+or6Zy7ajf4mz4rK7nsWJQ==}
 
   '@types/passport-strategy@0.2.38':
     resolution: {integrity: sha512-GC6eMqqojOooq993Tmnmp7AUTbbQSgilyvpCYQjT+H6JfG/g6RGc7nXEniZlp0zyKJ0WUdOiZWLBZft9Yug1uA==}
@@ -2775,6 +2867,13 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  cookie-parser@1.4.7:
+    resolution: {integrity: sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw==}
+    engines: {node: '>= 0.8.0'}
+
+  cookie-signature@1.0.6:
+    resolution: {integrity: sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==}
 
   cookie-signature@1.2.2:
     resolution: {integrity: sha512-D76uU73ulSXrD1UXF4KE2TMxVVwhsnCgfAyTg9k8P6KGZjlXKrOLe4dJQKI3Bxi5wjesZoFXJWElNWBjPZMbhg==}
@@ -4184,9 +4283,6 @@ packages:
   passport-jwt@4.0.1:
     resolution: {integrity: sha512-UCKMDYhNuGOBE9/9Ycuoyh7vP6jpeTp/+sfMJl7nLff/t6dps+iaeE0hhNkKN8/HZHcJ7lCdOyDxHdDoxoSvdQ==}
 
-  passport-linkedin-oauth2@2.0.0:
-    resolution: {integrity: sha512-PnSeq2HzFQ/y1/p2RTF/kG2zhJ7kwGVg4xO3E+JNxz2aI0pFJGAqC503FVpUksYbhQdNhL6QYlK9qrEXD7ZYCg==}
-
   passport-oauth2@1.8.0:
     resolution: {integrity: sha512-cjsQbOrXIDE4P8nNb3FQRCCmJJ/utnFKEz2NX209f7KOHPoX18gF7gBzBbLLsj2/je4KrgiwLLGjf0lm9rtTBA==}
     engines: {node: '>= 0.4.0'}
@@ -5265,6 +5361,47 @@ snapshots:
 
   '@colors/colors@1.5.0':
     optional: true
+
+  '@electric-sql/pglite-age@0.0.11(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_hashids@0.0.11(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_ivm@0.0.11(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_textsearch@0.0.12(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pg_uuidv7@0.0.11(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pgtap@0.0.11(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-pgvector@0.0.11(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+
+  '@electric-sql/pglite-socket@0.2.13(@electric-sql/pglite-age@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_hashids@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_ivm@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_textsearch@0.0.12(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pg_uuidv7@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pgtap@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite-pgvector@0.0.11(@electric-sql/pglite@0.5.10))(@electric-sql/pglite@0.5.10)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.10
+      '@electric-sql/pglite-age': 0.0.11(@electric-sql/pglite@0.5.10)
+      '@electric-sql/pglite-pg_hashids': 0.0.11(@electric-sql/pglite@0.5.10)
+      '@electric-sql/pglite-pg_ivm': 0.0.11(@electric-sql/pglite@0.5.10)
+      '@electric-sql/pglite-pg_textsearch': 0.0.12(@electric-sql/pglite@0.5.10)
+      '@electric-sql/pglite-pg_uuidv7': 0.0.11(@electric-sql/pglite@0.5.10)
+      '@electric-sql/pglite-pgtap': 0.0.11(@electric-sql/pglite@0.5.10)
+      '@electric-sql/pglite-pgvector': 0.0.11(@electric-sql/pglite@0.5.10)
+
+  '@electric-sql/pglite@0.5.10': {}
 
   '@eloqnt/config@0.1.1': {}
 
@@ -6979,6 +7116,10 @@ snapshots:
     dependencies:
       '@types/node': 24.19.2
 
+  '@types/cookie-parser@1.4.10(@types/express@5.0.6)':
+    dependencies:
+      '@types/express': 5.0.6
+
   '@types/cookiejar@2.1.5': {}
 
   '@types/deep-eql@4.0.2': {}
@@ -7025,10 +7166,32 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
+  '@types/oauth@0.9.6':
+    dependencies:
+      '@types/node': 24.19.2
+
+  '@types/passport-facebook@3.0.4':
+    dependencies:
+      '@types/express': 5.0.6
+      '@types/passport': 1.0.17
+      '@types/passport-oauth2': 1.8.0
+
+  '@types/passport-google-oauth20@2.0.17':
+    dependencies:
+      '@types/express': 5.0.6
+      '@types/passport': 1.0.17
+      '@types/passport-oauth2': 1.8.0
+
   '@types/passport-jwt@4.0.1':
     dependencies:
       '@types/jsonwebtoken': 9.0.10
       '@types/passport-strategy': 0.2.38
+
+  '@types/passport-oauth2@1.8.0':
+    dependencies:
+      '@types/express': 5.0.6
+      '@types/oauth': 0.9.6
+      '@types/passport': 1.0.17
 
   '@types/passport-strategy@0.2.38':
     dependencies:
@@ -7641,6 +7804,13 @@ snapshots:
   content-type@3.1.1: {}
 
   convert-source-map@2.0.0: {}
+
+  cookie-parser@1.4.7:
+    dependencies:
+      cookie: 0.7.2
+      cookie-signature: 1.0.6
+
+  cookie-signature@1.0.6: {}
 
   cookie-signature@1.2.2: {}
 
@@ -9213,10 +9383,6 @@ snapshots:
     dependencies:
       jsonwebtoken: 9.0.3
       passport-strategy: 1.0.0
-
-  passport-linkedin-oauth2@2.0.0:
-    dependencies:
-      passport-oauth2: 1.8.0
 
   passport-oauth2@1.8.0:
     dependencies:

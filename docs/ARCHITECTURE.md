@@ -5,7 +5,33 @@
 - `RolesGuard` is **deny-by-default**: every endpoint MUST declare either `@Roles(...)` (allowed roles) or `@Public()` (no authentication, e.g. `/health`, OAuth callbacks). A route with neither returns `403 Forbidden`.
 - `@Roles(...)` / `@Public()` may be applied at handler or controller level; handler-level metadata overrides controller-level.
 - Supported User Roles: `SUPER_ADMIN`, `CLINIC_ADMIN`, `VETERINARIAN`, `ASSISTANT`.
-- JWT payload: `{ sub, tenantId, role }`. The backend reads it from the `Authorization: Bearer` header. Web keeps the token in an HTTP-only cookie (synced by Next.js); mobile keeps it in `expo-secure-store`.
+- JWT payload: `{ sub, tenantId, role, typ: 'access' }`. The backend reads it from the `Authorization: Bearer` header. Web keeps the token in an HTTP-only cookie (synced by Next.js); mobile keeps it in `expo-secure-store`.
+- Use `@CurrentUser()` to read `{ userId, tenantId, role }` in handlers. Tenant-scoped queries MUST filter by `tenantId` from the token, never from the request body.
+
+### 1.1 Social Login Flow
+```
+Browser ──GET /auth/oauth/:provider──────────▶ Backend   (OAuthGuard: random `state` → HTTP-only cookie)
+Browser ◀──302 provider consent screen───────── Backend
+Browser ──GET /auth/oauth/:provider/callback─▶ Backend   (state checked; strategy → UsersService.findOrCreateFromOAuth)
+Browser ◀──302 APP_URL/auth/callback?code=…──── Backend   (code = 60-second JWT, typ 'exchange')
+Next.js route handler ──POST /auth/exchange──▶ Backend   (server-to-server; returns access token)
+Browser ◀──302 / + Set-Cookie vp_session (HttpOnly, SameSite=Lax, Secure in prod)── Next.js
+Next.js server components ──GET /auth/me (Bearer from cookie)──▶ Backend
+```
+- Providers: `google` (`passport-google-oauth20`), `linkedin` (custom OpenID Connect strategy on `passport-oauth2`; the legacy `passport-linkedin-oauth2` API is retired), `facebook` (`passport-facebook`).
+- Sign-in resolution: linked provider identity → existing user with the same **verified** email (links the provider) → otherwise a new tenant with the user as `CLINIC_ADMIN`. Unverified emails are rejected.
+- A provider without credentials in `.env` is disabled: its button sends users back to `/login?error=provider_unavailable`.
+- OAuth routes are browser-facing: errors redirect to `APP_URL/login?error=…` (`OAuthRedirectFilter`) instead of returning JSON.
+- The token never reaches client-side JavaScript. The browser only talks to the backend for the OAuth redirects.
+
+### 1.2 Setup Checklist
+1. `.env` (root): `JWT_SECRET` (long random string), `API_URL=http://localhost:4000`, `APP_URL=http://localhost:3000`, provider credentials, `DATABASE_URL`.
+2. Register these redirect URIs with each provider (swap the host in production):
+   - Google Cloud Console → OAuth client → `http://localhost:4000/auth/oauth/google/callback`
+   - LinkedIn Developers → app → Products: **Sign In with LinkedIn using OpenID Connect** → `http://localhost:4000/auth/oauth/linkedin/callback`
+   - Meta for Developers → Facebook Login → `http://localhost:4000/auth/oauth/facebook/callback`
+3. Apply migrations: `pnpm --filter @vet-plan/backend migration:run`.
+4. Promote platform staff manually: `UPDATE users SET role = 'SUPER_ADMIN', tenant_id = NULL WHERE email = '…';`
 
 ## 2. Shared Workspace Packages
 | Package | Contents | May import |
@@ -61,3 +87,19 @@ Dependencies point **down only**. Apps contain routing, platform setup, and plat
 - The surgical math stays in `@vet-plan/shared` and runs on both platforms.
 - The web viewer (`apps/frontend/src/components/canvas`) uses Canvas/WebGL and is web-only.
 - A mobile viewer, if needed, uses `@shopify/react-native-skia` in `apps/mobile`. Measurement *state* (points, lines, results) can still live in `packages/app`.
+
+## 5. Data Model & Migrations
+| Table | Key columns | Notes |
+|---|---|---|
+| `tenants` | `id` uuid, `name` | One per clinic |
+| `users` | `id`, `email` (unique, lowercased), `display_name`, `avatar_url`, `role` (`user_role` enum), `tenant_id` → `tenants` (RESTRICT), `last_login_at` | `tenant_id` is NULL only for `SUPER_ADMIN` |
+| `oauth_accounts` | `id`, `provider` (`oauth_provider` enum), `provider_user_id`, `user_id` → `users` (CASCADE) | Unique `(provider, provider_user_id)`; one user can link several providers |
+
+- `Role` is a Postgres enum mirroring `@vet-plan/shared` (fixed set, so no roles table). Adding a role = shared enum + migration.
+- Entities live next to their module (`modules/users/user.entity.ts`). Register each entity in `ENTITIES` and each migration in `MIGRATIONS` in `src/config/database.config.ts` (explicit imports, no globs, so both `dist/` and Vitest load them).
+- `synchronize` is always off. Schema changes go through migrations:
+  - `pnpm --filter @vet-plan/backend migration:generate src/migrations/<Name>` (diffs entities against `DATABASE_URL`)
+  - `pnpm --filter @vet-plan/backend migration:run` / `migration:revert` / `migration:show`
+- UUIDs use `gen_random_uuid()` (core Postgres 13+), so Neon needs no extensions.
+- **Local database without Docker:** `pnpm --filter @vet-plan/backend db:local` starts PGlite (real Postgres compiled to WASM) on `127.0.0.1:5432`, persisted in `apps/backend/.pglite/`. Use `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres`.
+- **Tests:** e2e tests boot the full `AppModule` against a throwaway in-memory PGlite with migrations applied (`test/utils/test-app.ts`). `NODE_ENV=test` makes `ConfigModule` ignore `.env`, so tests never touch Neon or real credentials.
