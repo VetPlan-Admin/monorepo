@@ -87,6 +87,11 @@ input). Optional steps that fail (e.g. no cage large enough) become **warnings**
 | `DISTANCE` | start, end | — | px, or mm when calibrated |
 | `ANGLE_BETWEEN_LINES` | line 1 start/end, line 2 start/end | — | acute angle between the lines |
 
+**Plans** (`plan.ts`): a set of measurements on one radiograph. `resolvePlanCalibration` picks the
+scale (latest complete calibration measurement → declared image spacing → none) and
+`computePlanResults` returns `{ calibration, results }`. The API runs it on every save, so stored
+values always come from the server, never from a client.
+
 Overlay shapes (`segment`, `arrow`, `circle`, `label`) carry an emphasis: `primary` (measured
 lines), `secondary` (axes, fitted outlines), `guide` (reference/planned lines, drawn dashed). The
 TTA guide shows the planned tendon line and the advancement arrow; the TPA guide shows the

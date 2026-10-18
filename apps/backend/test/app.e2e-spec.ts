@@ -38,7 +38,7 @@ describe('App (e2e)', () => {
       .get('/cases')
       .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.VETERINARIAN)}`)
       .expect(200)
-      .expect([]);
+      .expect({ items: [], total: 0, page: 1, pageSize: 20 });
   });
 
   it('GET /cases allows assistants', () => {
@@ -63,11 +63,11 @@ describe('App (e2e)', () => {
       .expect(403);
   });
 
-  it('POST /cases reaches the handler for veterinarians', () => {
+  it('POST /cases reaches validation for veterinarians', () => {
     return request(ctx.app.getHttpServer())
       .post('/cases')
       .set('Authorization', `Bearer ${ctx.accessTokenFor(Role.VETERINARIAN)}`)
       .send({})
-      .expect(501);
+      .expect(400);
   });
 });

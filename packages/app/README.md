@@ -7,11 +7,14 @@ Apps keep only thin route files and providers. Ships TypeScript source. Rules: `
 | Export | Purpose |
 |---|---|
 | `HomeScreen` | Title, API health badge, links. `session` prop is a slot for platform session UI |
-| `CasesScreen` | Placeholder for Phase 5 |
-| `createApiClient`, `ApiClient`, `ApiError` | Typed fetch client; DTOs from `@vet-plan/shared` |
-| `ApiProvider`, `useApiClient` | Provides the client (`baseUrl` from each app) |
+| `CasesScreen` | Case history: search, status/procedure filters, pagination, status badges |
+| `NewCaseScreen` | Create a case for an existing patient or register the patient inline |
+| `CaseDetailScreen` | Patient, status workflow, notes, saved plans + results. Slots: `renderCaseActions`, `renderPlanActions` |
+| `CaseStatusBadge`, `Screen`, `Card`, `Field`, `ErrorMessage`, `Loading` | Building blocks for screens |
+| `createApiClient`, `ApiClient`, `ApiError`, `describeApiError` | Typed fetch client for every endpoint; DTOs from `@vet-plan/shared` |
+| `ApiProvider`, `useApiClient`, `useApiQuery` | Client injection (`baseUrl` per app) and an abortable data-loading hook keyed by its inputs |
 | `useApiHealth` | `GET /health` status + `refresh()` |
-| `NavigationProvider`, `Link`, `LinkProps` | Solito-style navigation: screens use `Link href="/cases"`; each app injects its router's link |
+| `NavigationProvider`, `Link`, `useNavigate` | Solito-style navigation: each app injects its router's link and `navigate` |
 
 ## Adding a screen
 1. `src/features/<feature>/<name>-screen.tsx`, starting with `'use client'`.

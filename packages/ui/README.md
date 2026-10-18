@@ -8,6 +8,9 @@ natively (NativeWind v5); Next.js renders them through react-native-web. Ships T
 | Export | Purpose |
 |---|---|
 | `Button` | Brand button: `variant="primary"` (purple on yellow) or `"outline"`; all `Pressable` props |
+| `Badge` | Small status pill: `tone` = `brand`, `outline`, `success`, `muted` |
+| `TextField` | Labelled `TextInput` with an optional `error` message (`multiline` supported) |
+| `ChoiceChips` | Single-choice chips (cross-platform `<select>`); `allowDeselect` for optional fields |
 | `@vet-plan/ui/react-native-web-shim` | **Web only.** `apps/frontend` aliases `react-native` to it. Re-exports react-native-web and adds `className` support to `View`, `Text`, `Pressable`, `ScrollView`, `Image`, `TextInput`, `ActivityIndicator` |
 
 ## Adding a component

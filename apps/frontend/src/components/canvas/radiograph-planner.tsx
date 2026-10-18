@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { getMeasurementDefinition, MeasurementType } from "@vet-plan/shared";
 import type { Point2D } from "@vet-plan/shared";
 import { FolderOpen, Maximize2, ShieldCheck } from "lucide-react";
@@ -9,6 +10,7 @@ import { loadRadiograph } from "./image/load-image";
 import { ImageLoadError } from "./image/types";
 import type { RadiographImage, WindowLevel } from "./image/types";
 import { MeasurementCard } from "./measurement-card";
+import { PlannerCasePanel } from "./planner-case-panel";
 import { PlannerCanvas } from "./planner-canvas";
 import type { CanvasLayer } from "./planner-canvas";
 import { evaluatePlan, findHandle, initialPlannerState, plannerReducer, resolveCalibration } from "./planner-state";
@@ -38,6 +40,7 @@ export function RadiographPlanner() {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [plan, dispatch] = useReducer(plannerReducer, initialPlannerState);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
 
   const { calibration, source: calibrationSource } = useMemo(
     () => resolveCalibration(plan, image?.pixelSpacing),
@@ -79,8 +82,13 @@ export function RadiographPlanner() {
 
   const onPlacePoint = useCallback((point: Point2D) => dispatch({ type: "placePoint", point }), []);
   const onMovePoint = useCallback(
-    (handle: PointHandle, point: Point2D) => dispatch({ type: "movePoint", ...handle, point }),
-    [],
+    (handle: PointHandle, point: Point2D) => {
+      if (!image) return;
+      // Landmarks stay inside the image (the API rejects points outside it)
+      const clamped = { x: Math.min(Math.max(point.x, 0), image.width), y: Math.min(Math.max(point.y, 0), image.height) };
+      dispatch({ type: "movePoint", ...handle, point: clamped });
+    },
+    [image],
   );
   const onUndo = useCallback(() => dispatch({ type: "undoPoint" }), []);
   const onFindHandle = useCallback((point: Point2D, tolerance: number) => findHandle(plan, point, tolerance), [plan]);
@@ -208,6 +216,19 @@ export function RadiographPlanner() {
           ) : (
             <p className="text-xs text-brand-yellow/70">Not calibrated: angles work, millimetre results need a calibration.</p>
           )}
+        </section>
+
+        <section aria-labelledby="case-heading" className="space-y-2">
+          <h2 id="case-heading" className="text-sm font-semibold uppercase tracking-wide text-brand-yellow/70">
+            Case
+          </h2>
+          <PlannerCasePanel
+            caseId={searchParams.get("case")}
+            planId={searchParams.get("plan")}
+            image={image}
+            measurements={plan.measurements}
+            onLoadPlan={(measurements) => dispatch({ type: "load", measurements })}
+          />
         </section>
 
         {TOOL_GROUPS.map((group) => (

@@ -9,27 +9,40 @@ export interface LinkProps {
     children: ReactNode;
 }
 
-const LinkContext = createContext<ComponentType<LinkProps> | null>(null);
-
-export interface NavigationProviderProps {
-    /** The platform's router link: `next/link` on web, Expo Router's `Link` on mobile. */
+interface Navigation {
     link: ComponentType<LinkProps>;
+    navigate: (href: string) => void;
+}
+
+const NavigationContext = createContext<Navigation | null>(null);
+
+export interface NavigationProviderProps extends Navigation {
     children: ReactNode;
 }
 
 /**
- * Solito-style navigation without a router dependency: shared screens render `<Link>`, and each
- * app injects its real router link here. (Solito 5 targets React Navigation, which Expo Router 58
- * replaced with a vendored fork, so it can't drive Expo Router 58 on native.)
+ * Solito-style navigation without a router dependency: shared screens render `<Link>` or call
+ * `useNavigate()`, and each app injects its real router here (`next/link` + `useRouter` on web,
+ * Expo Router on mobile). Solito 5 targets React Navigation, which Expo Router 58 replaced.
  */
-export function NavigationProvider({ link, children }: NavigationProviderProps) {
-    return <LinkContext value={link}>{children}</LinkContext>;
+export function NavigationProvider({ link, navigate, children }: NavigationProviderProps) {
+    return <NavigationContext value={{ link, navigate }}>{children}</NavigationContext>;
+}
+
+function useNavigation(): Navigation {
+    const navigation = useContext(NavigationContext);
+    if (!navigation) {
+        throw new Error('Navigation must be used within a NavigationProvider');
+    }
+    return navigation;
 }
 
 export function Link(props: LinkProps) {
-    const PlatformLink = useContext(LinkContext);
-    if (!PlatformLink) {
-        throw new Error('Link must be used within a NavigationProvider');
-    }
+    const { link: PlatformLink } = useNavigation();
     return <PlatformLink {...props} />;
+}
+
+/** Imperative navigation, e.g. after creating a record. */
+export function useNavigate(): (href: string) => void {
+    return useNavigation().navigate;
 }

@@ -56,10 +56,21 @@ Reference: ARCHITECTURE §7, SURGICAL_MATH §3.
 - [ ] Keep labels from covering handles (collision-aware label placement).
 
 ## Phase 5: Surgical Case Management & Workflows
-- [ ] Build Patient & Surgical Case REST endpoints with RBAC protection (`@Roles` on every handler; DTOs in `@vet-plan/shared`).
-- [ ] Save planner measurements with the case: `{ type, points, parameters }` per measurement (image pixels) + image dimensions + calibration source. The backend recomputes values with `evaluateMeasurement`; never trust client-computed numbers. Decide whether radiographs are stored (cost/privacy) or only landmarks.
-- [ ] Create case history screens in `packages/app` (search, filter, procedure status badges), routed on web and mobile.
-- [ ] Add JSON metadata export for surgical planning reports.
+Reference: ARCHITECTURE §1.3 (permissions), §5 (data model), §8 (cases API & flows).
+- [x] Patients & surgical cases REST API: `/patients`, `/cases`, tenant-scoped (other clinics' records → 404), RBAC per action, Zod schemas from `@vet-plan/shared` validated by `ZodValidationPipe`, pagination + search (patient, owner, record number) + filters.
+- [x] Case status workflow `PLANNING → PLANNED → COMPLETED` (+ `CANCELLED`, reopenable); clinical fields and plans freeze once completed or cancelled.
+- [x] Radiograph plans: landmarks + image size + declared spacing per plan; the API recomputes results with `computePlanResults` and stores the snapshot. **Decision: radiographs are not stored** (privacy, $0 storage); a plan is re-attached to the same file in the planner.
+- [x] Case screens in `packages/app` (list with search/filters/pagination and status badges, new case with inline patient registration, detail with workflow, notes and plan results), routed on web (`/cases`, `/cases/new`, `/cases/[id]`) and mobile.
+- [x] Planner ↔ case: save/update a plan from `/planner?case=…`, reload saved landmarks onto the same radiograph (`&plan=…`).
+- [x] JSON report export: `GET /cases/:id/report` (`vet-plan.surgical-plan-report` v1, downloadable from the case page).
+- [x] Web data access through the same-origin proxy `/api/backend/*` (session cookie stays HTTP-only; allowlist + Origin check).
+- [x] Tests: backend e2e (permissions, tenant isolation, validation, workflow, plan recomputation, report), shared schema/plan specs, proxy unit tests, full-stack browser run (17 checks).
+- [ ] **Your setup:** run `pnpm --filter @vet-plan/backend migration:run` on Neon for `AddPatientsCasesAndPlans`.
+- [ ] Mobile data access needs mobile sign-in (Phase 2 follow-up); until then mobile case screens show "session expired".
+- [ ] Clinic invitations (Phase 1 follow-up): without them every sign-up is a `CLINIC_ADMIN` of a new clinic, so assistants and vets can't join yet.
+- [ ] Edit-patient screen (the API already supports `PATCH /patients/:id`) and case deletion in the UI (`CLINIC_ADMIN`, API ready).
+- [ ] Printable/PDF report and report sharing on mobile.
+- [ ] Audit trail for status changes and plan edits; optimistic concurrency for plan updates (two planners editing one plan).
 
 ## Phase 6: AI Support Bot & Observability
 - [ ] Build Telegram webhook handler in NestJS using Google AI Studio free Gemini API key.

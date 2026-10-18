@@ -1,19 +1,22 @@
 import {
   defaultParameters,
-  evaluateMeasurement,
+  evaluatePlanMeasurements,
   getMeasurementDefinition,
-  MeasurementType,
   nextLandmarkSlot,
+  resolvePlanCalibration,
 } from "@vet-plan/shared";
-import type { Calibration, MeasurementEvaluation, Point2D } from "@vet-plan/shared";
-import type { PixelSpacing } from "./image/types";
+import type {
+  Calibration,
+  ImageSpacing,
+  MeasurementEvaluation,
+  MeasurementType,
+  PlanCalibration,
+  PlanMeasurement,
+  Point2D,
+} from "@vet-plan/shared";
 
-export interface PlannedMeasurement {
-  id: string;
-  type: MeasurementType;
-  points: Record<string, Point2D[]>;
-  parameters: Record<string, number>;
-}
+/** Same shape the API stores, so plans round-trip without conversion. */
+export type PlannedMeasurement = PlanMeasurement;
 
 export interface PlannerState {
   measurements: PlannedMeasurement[];
@@ -28,7 +31,9 @@ export type PlannerAction =
   | { type: "undoPoint" }
   | { type: "remove"; id: string }
   | { type: "setParameter"; id: string; key: string; value: number }
-  | { type: "reset" };
+  | { type: "reset" }
+  /** Replaces all measurements, e.g. with a plan saved to a case. */
+  | { type: "load"; measurements: PlannedMeasurement[] };
 
 export const initialPlannerState: PlannerState = { measurements: [], activeId: null };
 
@@ -96,6 +101,8 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
       }));
     case "reset":
       return initialPlannerState;
+    case "load":
+      return { measurements: action.measurements, activeId: null };
   }
 }
 
@@ -126,42 +133,20 @@ export function findHandle(state: PlannerState, point: Point2D, tolerance: numbe
   return null;
 }
 
-export interface ResolvedCalibration {
-  calibration?: Calibration;
-  /** Human-readable origin, e.g. "Calibration (marker ball)" or "DICOM PixelSpacing". */
-  source?: string;
-}
+export type ResolvedCalibration = PlanCalibration;
 
 /**
- * Calibration for mm results: the most recently added complete calibration measurement wins,
- * then the DICOM pixel spacing, otherwise none.
+ * Calibration for mm results (shared with the backend): the most recently added complete
+ * calibration measurement wins, then the DICOM pixel spacing, otherwise none.
  */
-export function resolveCalibration(state: PlannerState, spacing?: PixelSpacing): ResolvedCalibration {
-  for (const measurement of [...state.measurements].reverse()) {
-    if (
-      measurement.type !== MeasurementType.CALIBRATION_MARKER &&
-      measurement.type !== MeasurementType.CALIBRATION_LENGTH
-    ) {
-      continue;
-    }
-    const evaluation = evaluateMeasurement(measurement.type, measurement.points, measurement.parameters);
-    if (evaluation.status === "complete" && evaluation.calibration) {
-      return { calibration: evaluation.calibration, source: getMeasurementDefinition(measurement.type).name };
-    }
-  }
-  if (spacing) {
-    return { calibration: { mmPerPixel: spacing.mmPerPixel }, source: `DICOM ${spacing.source}` };
-  }
-  return {};
+export function resolveCalibration(state: PlannerState, spacing?: ImageSpacing): ResolvedCalibration {
+  return resolvePlanCalibration(state.measurements, spacing);
 }
 
-/** Evaluates every measurement against the resolved calibration (calibrations evaluate without one). */
+/** Evaluates every measurement against the resolved calibration. */
 export function evaluatePlan(
   state: PlannerState,
   calibration: Calibration | undefined,
 ): { measurement: PlannedMeasurement; evaluation: MeasurementEvaluation }[] {
-  return state.measurements.map((measurement) => ({
-    measurement,
-    evaluation: evaluateMeasurement(measurement.type, measurement.points, measurement.parameters, calibration),
-  }));
+  return evaluatePlanMeasurements(state.measurements, calibration);
 }

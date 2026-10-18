@@ -3,3 +3,6 @@
 //   imports this package type-checks it the same way.
 
 export * from './button';
+export * from './badge';
+export * from './text-field';
+export * from './choice-chips';

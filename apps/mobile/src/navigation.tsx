@@ -1,4 +1,4 @@
-import { Link as ExpoLink } from "expo-router";
+import { Link as ExpoLink, router } from "expo-router";
 import type { Href } from "expo-router";
 import { Pressable } from "react-native";
 import type { LinkProps } from "@vet-plan/app";
@@ -12,4 +12,8 @@ export function MobileLink({ href, children }: LinkProps) {
       <Pressable>{children}</Pressable>
     </ExpoLink>
   );
+}
+
+export function mobileNavigate(href: string): void {
+  router.push(href as Href);
 }

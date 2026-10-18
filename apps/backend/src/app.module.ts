@@ -6,6 +6,7 @@ import { AppController } from './app.controller.js';
 import { buildDataSourceOptions } from './config/database.config.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CasesModule } from './modules/cases/cases.module.js';
+import { PatientsModule } from './modules/patients/patients.module.js';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
 
@@ -23,6 +24,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard.js';
         buildDataSourceOptions(configService.getOrThrow<string>('DATABASE_URL')),
     }),
     AuthModule,
+    PatientsModule,
     CasesModule,
   ],
   controllers: [AppController],

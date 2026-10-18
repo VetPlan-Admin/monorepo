@@ -19,8 +19,11 @@ Native requests don't send an `Origin` header, so the backend's CORS setting doe
 | Path | Purpose |
 |---|---|
 | `src/app/_layout.tsx` | Imports `global.css`; mounts `ApiProvider` and `NavigationProvider` |
-| `src/app/index.tsx`, `src/app/cases.tsx` | Thin routes rendering `HomeScreen` / `CasesScreen` |
-| `src/navigation.tsx` | Adapts Expo Router's `Link` to `@vet-plan/app`'s `Link` |
+| `src/app/index.tsx`, `src/app/cases/{index,new,[id]}.tsx` | Thin routes rendering the shared home and case screens |
+| `src/navigation.tsx` | Adapts Expo Router's `Link` and `router.push` to `@vet-plan/app`'s navigation |
+
+Case screens need an authenticated API client. Mobile sign-in isn't built yet (ROADMAP Phase 2), so
+they currently show "Your session has expired". The planner and report download are web-only.
 | `src/global.css` | NativeWind theme, brand tokens, `@source` for `packages/ui` and `packages/app` |
 | `metro.config.js` | `withNativewind(getDefaultConfig(__dirname))`. Monorepo resolution is automatic |
 | `nativewind-env.d.ts`, `css-modules.d.ts` | `className` types and CSS import declaration |

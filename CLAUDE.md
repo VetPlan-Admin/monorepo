@@ -28,6 +28,7 @@
 - **Local Postgres (no Docker):** `pnpm --filter @vet-plan/backend db:local` (PGlite on `127.0.0.1:5432`)
 - **Ports:** frontend `3000`, backend `4000` (`APP_URL` / `API_URL` in `.env`), Expo dev server `8081`
 - **Mobile dependencies:** `pnpm --filter @vet-plan/mobile exec expo install <pkg>` (SDK-compatible versions)
+- **Editor tip:** apps consume `@vet-plan/shared` from its built `dist/`. After the shared package is rebuilt, the editor's TypeScript server can keep stale declarations ("has no exported member …") while `pnpm typecheck` passes: run **TypeScript: Restart TS Server**.
 
 ## 4. Coding Standards & Governance
 - **TypeScript:** Strict mode enabled. No `any` casts without explicit justification.
@@ -37,6 +38,9 @@
 - **Surgical Math:** all clinical measurements live in `packages/shared/src/math/` and nowhere else (no angle maths in components or services). Inputs are image-pixel `Point2D` landmarks, outputs degrees/mm; invalid input throws `RangeError`. Coverage MUST stay at 100%, and formula or default changes MUST update `docs/SURGICAL_MATH.md`.
 - **Measurements in UIs:** canvases and screens call `evaluateMeasurement` from `@vet-plan/shared` and render its overlay/values; they never compute clinical values themselves. A new measurement = a protocol definition in `packages/shared/src/measurements/definitions.ts` + tests + a row in `docs/SURGICAL_MATH.md` §3.
 - **Radiograph Privacy:** the planner reads files in the browser and uploads nothing. Any feature that sends images or patient metadata to the backend needs an explicit decision recorded in `docs/ARCHITECTURE.md`.
+- **API Contracts:** request shapes are Zod schemas and responses are DTO types in `packages/shared/src/dtos/`. The backend validates with `ZodValidationPipe`; web/mobile forms validate with the same schemas. Never hand-write a duplicate interface.
+- **Tenant Isolation:** every clinical query filters by `requireTenantId(user)`; records of other clinics return 404. Use `CLINICAL_ROLES` / `PLANNING_ROLES` from `@vet-plan/shared` in `@Roles(...)` (matrix: `docs/ARCHITECTURE.md` §1.3).
+- **Web Data Access:** client components reach the API only through `useApiClient()` → `/api/backend/*` proxy. Add new API areas to `PROXIED_PREFIXES` in `src/lib/backend-proxy.ts` deliberately.
 - **Cross-Platform Code:** `packages/ui` and `packages/app` MUST NOT import from `next/*`, `expo-*`, or app folders. Write React Native primitives (`View`, `Text`, `Pressable`) with `className`; navigate with `Link` from `@vet-plan/app`; call the backend with `useApiClient()`. Shared files must start with `'use client'`. Exactly one React (19.3.0) and React Native (0.88.0) version in the repo. Rules in `docs/ARCHITECTURE.md` §4.
 - **Telemetry:** Expose OpenTelemetry metrics via `/metrics` on NestJS; do NOT introduce proprietary paid SaaS SDKs.
 - **Git Commit Style:** Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`).
@@ -60,8 +64,10 @@ vetplan-monorepo/
 │   │   │   │   │   ├── callback/route.ts # Exchanges code → sets HTTP-only vp_session cookie
 │   │   │   │   │   └── logout/route.ts   # POST: clears the cookie
 │   │   │   │   ├── (dashboard)/    # Main Surgical Planning Workspace (session required, see proxy.ts)
-│   │   │   │   │   ├── cases/page.tsx   # Thin route → CasesScreen from @vet-plan/app
+│   │   │   │   │   ├── cases/page.tsx, cases/new/page.tsx   # Thin routes → shared screens
+│   │   │   │   │   ├── cases/[id]/page.tsx  # Awaits params in <Suspense> → WebCaseDetail
 │   │   │   │   │   └── planner/page.tsx # Radiograph planner (web-only)
+│   │   │   │   ├── api/backend/[...path]/route.ts  # Same-origin API proxy (adds the session token)
 │   │   │   │   ├── globals.css     # Tailwind layers + tokens + @source for shared packages
 │   │   │   │   ├── layout.tsx      # StylesProvider, ApiProvider, WebNavigationProvider
 │   │   │   │   ├── navigation-provider.tsx  # Injects next/link into @vet-plan/app's Link
@@ -75,9 +81,12 @@ vetplan-monorepo/
 │   │   │   │       ├── overlay-renderer.ts  # High-contrast drawing of protocol overlays
 │   │   │   │       ├── planner-canvas.tsx   # Canvas + pointer/keyboard interaction
 │   │   │   │       ├── radiograph-planner.tsx, measurement-card.tsx
+│   │   │   │       ├── planner-case-panel.tsx  # Save/reload plans of a case
 │   │   │   │       └── __fixtures__/        # DICOM writer + real JPEG Lossless sample
+│   │   │   │   └── cases/web-case-detail.tsx  # Web extras (planner links, report download)
 │   │   │   ├── lib/
 │   │   │   │   ├── api.ts          # Server-only backend URL
+│   │   │   │   ├── backend-proxy.ts   # Proxy logic (allowlist, Origin check) + tests
 │   │   │   │   ├── session.ts      # getCurrentUser() ('use cache: private')
 │   │   │   │   └── session-cookie.ts  # Cookie name shared with proxy.ts
 │   │   │   ├── proxy.ts            # Redirects /planner, /cases to /login without a session
@@ -88,7 +97,7 @@ vetplan-monorepo/
 │   │
 │   ├── mobile/                     # Expo SDK 58 + Expo Router + NativeWind v5
 │   │   ├── src/
-│   │   │   ├── app/                # Expo Router routes: _layout.tsx (providers), index.tsx, cases.tsx
+│   │   │   ├── app/                # Expo Router routes: _layout.tsx (providers), index.tsx, cases/{index,new,[id]}.tsx
 │   │   │   ├── global.css          # NativeWind + tokens + @source for shared packages
 │   │   │   └── navigation.tsx      # Injects expo-router Link into @vet-plan/app's Link
 │   │   ├── app.json                # Expo config (name, scheme `vetplan`, brand splash)
@@ -103,9 +112,11 @@ vetplan-monorepo/
 │       │   │   │                   # guards (global JWT + Roles, OAuthGuard), decorators, filters
 │       │   │   ├── users/          # User & OAuthAccount entities, UsersService (sign-in resolution)
 │       │   │   ├── tenants/        # Tenant entity (clinic)
-│       │   │   ├── cases/          # Orthopedic Surgical Cases & Measurements
+│       │   │   ├── patients/       # Patient entity, service, controller (/patients)
+│       │   │   ├── cases/          # SurgicalCase + RadiographPlan entities, /cases API, report builder
 │       │   │   ├── ai-bot/         # (planned) Gemini 2.5 Flash Triage & Telegram Webhook
 │       │   │   └── telemetry/      # (planned) OpenTelemetry & Prometheus /metrics
+│       │   ├── common/             # ZodValidationPipe, requireTenantId, escapeLike
 │       │   ├── config/             # database.config.ts (entities, migrations) + data-source.ts (CLI)
 │       │   ├── migrations/         # TypeORM migrations (registered in database.config.ts)
 │       │   ├── app.module.ts
@@ -119,10 +130,12 @@ vetplan-monorepo/
 │   ├── shared/                     # DTOs, Enums (Role…), surgical math engine. No React.
 │   │   └── src/
 │   │       ├── math/               # geometry, calibration, tplo, tta, norberg (+ specs, __fixtures__)
-│   │       └── measurements/       # Protocols: landmarks, parameters, evaluateMeasurement
+│   │       ├── measurements/       # Protocols: landmarks, parameters, evaluateMeasurement, plan results
+│   │       ├── dtos/               # Zod schemas + DTO types (patients, cases, plans, report)
+│   │       └── enums/              # Role groups, CaseStatus + transitions, Species, Limb, …
 │   ├── tokens/                     # Design tokens (TS + generated Tailwind theme.css)
-│   ├── ui/                         # Cross-platform primitives (Button) + web react-native shim
-│   ├── app/                        # Cross-platform screens, API client, ApiProvider, Link
+│   ├── ui/                         # Cross-platform primitives (Button, Badge, TextField, ChoiceChips) + web shim
+│   ├── app/                        # Shared screens (home, cases), API client, useApiQuery, providers, Link
 │   └── config/                     # (planned) Shared ESLint, TS, Prettier Configs
 │
 ├── docs/                           # ROADMAP.md, ARCHITECTURE.md, SURGICAL_MATH.md

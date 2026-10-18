@@ -1,13 +1,12 @@
+import type { ImageSpacing } from "@vet-plan/shared";
+
 export interface WindowLevel {
   center: number;
   width: number;
 }
 
-export interface PixelSpacing {
-  mmPerPixel: number;
-  /** PixelSpacing is calibrated at the patient; ImagerPixelSpacing is at the detector (magnified). */
-  source: "PixelSpacing" | "ImagerPixelSpacing";
-}
+/** PixelSpacing is calibrated at the patient; ImagerPixelSpacing is at the detector (magnified). */
+export type PixelSpacing = ImageSpacing;
 
 export interface ImageMetadata {
   fileName: string;

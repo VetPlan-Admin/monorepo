@@ -109,3 +109,11 @@ describe("calibration & evaluation", () => {
     expect(evaluation).toMatchObject({ status: "complete", values: [{ value: 25, unit: "mm" }] });
   });
 });
+
+describe("load", () => {
+  it("replaces measurements with a saved plan and clears the selection", () => {
+    const saved = [{ id: "x", type: MeasurementType.DISTANCE, points: { start: [{ x: 1, y: 2 }] }, parameters: {} }];
+    const state = run({ type: "add", id: "a", measurementType: MeasurementType.DISTANCE }, { type: "load", measurements: saved });
+    expect(state).toEqual({ measurements: saved, activeId: null });
+  });
+});
