@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "@vet-plan/frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@vet-plan/tokens": "workspace:*",
     "lucide-react": "^1.56.0",
     "next": "16.4.0",
     "next-intl": "^4.14.9",

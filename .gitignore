@@ -7,12 +7,16 @@ node_modules/
 .env.*
 !.env.example
 
-# Next.js build outputs
-apps/frontend/.next/
-apps/frontend/out/
+# Build outputs (Next.js, NestJS, shared packages) at any depth
+.next/
+out/
+dist/
+build/
+coverage/
 
-# NestJS build outputs
-apps/backend/dist/
+# Turborepo cache & TypeScript incremental build info
+.turbo/
+*.tsbuildinfo
 
 # IDE / System files
 .vscode/

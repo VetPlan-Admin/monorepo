@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Brand colors (bg-brand-purple, text-brand-yellow, ...) shared with apps/mobile */
+@import "@vet-plan/tokens/theme.css";
 
 :root {
   --background: #ffffff;

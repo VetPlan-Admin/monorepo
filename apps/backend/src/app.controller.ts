@@ -1,12 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service.js';
+import { Public } from './modules/auth/decorators/public.decorator.js';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Public() // Bypasses JWT check so health checks return 200 OK
+  @Get('health')
+  getHealth(): { status: string } {
+    return { status: 'ok' };
   }
 }

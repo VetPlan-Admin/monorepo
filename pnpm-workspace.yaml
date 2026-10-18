@@ -3,10 +3,11 @@ packages:
   - "packages/*"
 
 allowBuilds:
-  '@parcel/watcher': set this to true or false
+  '@parcel/watcher': true
   '@swc/core': true
   protobufjs: true
-  unrs-resolver: set this to true or false
+  sharp: false
+  unrs-resolver: true
 
 # Disable supply-chain release delay during local bootstrapping
 minimumReleaseAge: 0
