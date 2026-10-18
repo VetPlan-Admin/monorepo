@@ -1,6 +1,19 @@
-@import "tailwindcss";
+/*
+ * Cascade order (lowest → highest): rnw (react-native-web SSR styles, see styles-provider.tsx),
+ * theme, base, then UNLAYERED utilities. react-native-web injects unlayered base styles at the
+ * top of <head>; unlayered utilities loaded later beat them, so `className` on shared React
+ * Native components works (same setup NativeWind recommends).
+ */
+@layer rnw, theme, base;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
 /* Brand colors (bg-brand-purple, text-brand-yellow, ...) shared with apps/mobile */
 @import "@vet-plan/tokens/theme.css";
+
+/* Tailwind only scans apps/frontend by default; shared screens and components live here */
+@source "../../../../packages/ui/src";
+@source "../../../../packages/app/src";
 
 :root {
   --background: #ffffff;

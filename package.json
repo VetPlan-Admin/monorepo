@@ -7,7 +7,8 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "migration:run": "pnpm --filter @vet-plan/backend migration:run"
+    "migration:run": "pnpm --filter @vet-plan/backend migration:run",
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

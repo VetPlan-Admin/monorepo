@@ -38,8 +38,8 @@ Next.js server components ──GET /auth/me (Bearer from cookie)──▶ Backe
 |---|---|---|
 | `@vet-plan/shared` | DTOs, Enums (`Role`, `Species`, `ProcedureType`), pure surgical math | nothing (no React) |
 | `@vet-plan/tokens` | Brand colors & design tokens; build emits `dist/theme.css` | nothing |
-| `@vet-plan/ui` *(planned)* | Cross-platform primitives (Button, Card, Input) | `shared`, `tokens`, `react-native`, `nativewind` |
-| `@vet-plan/app` *(planned)* | Screens, features, API client, navigation | `ui`, `shared`, `tokens`, `solito` |
+| `@vet-plan/ui` | Cross-platform primitives (`Button`) + the web `react-native` shim | `tokens`, `react-native` |
+| `@vet-plan/app` | Screens, API client, `ApiProvider`, `NavigationProvider`/`Link` | `ui`, `shared`, `tokens`, `react-native` |
 | `packages/config` *(planned)* | Centralized ESLint, Prettier, TS base configs | — |
 
 ## 3. $0 Infrastructure Stack Boundary
@@ -51,37 +51,49 @@ Next.js server components ──GET /auth/me (Bearer from cookie)──▶ Backe
 - Mobile builds: Expo Go and local builds are free; EAS Build free plan has a monthly build quota.
 - **Known non-zero costs (publishing only):** Apple Developer Program $99/year, Google Play $25 one-time.
 
-## 4. Cross-Platform Frontend (Solito 5 + Expo Router + NativeWind)
+## 4. Cross-Platform Frontend (Expo Router + NativeWind + Solito-style navigation)
 
 ### 4.1 Layering
 ```
-apps/frontend (Next.js 16)        apps/mobile (Expo Router, SDK 58)
-  route files only ──┐               route files only ──┐
-                     ▼                                  ▼
-               packages/app   ← screens, features, API client, solito navigation
-                     ▼
-               packages/ui    ← View/Text/Pressable + className (NativeWind)
-                     ▼
-     packages/tokens   packages/shared   ← no React, platform-neutral
+apps/frontend (Next.js 16)                 apps/mobile (Expo SDK 58, Expo Router)
+  route files + providers ──┐                route files + providers ──┐
+  (next/link → NavigationProvider)           (expo-router Link → NavigationProvider)
+                            ▼                                          ▼
+                      packages/app   ← screens, API client, ApiProvider, Link
+                            ▼
+                      packages/ui    ← View/Text/Pressable + className
+                            ▼
+            packages/tokens   packages/shared   ← no React, platform-neutral
 ```
-Dependencies point **down only**. Apps contain routing, platform setup, and platform-only features. Shared packages never import from apps.
+Dependencies point **down only**. Apps contain routing, providers, and platform-only features (web: session cookie, login page; later mobile: secure-store auth). Shared packages never import from apps, `next/*`, or `expo-*`.
 
-### 4.2 Rules
-- **Routing:** URLs are identical on both platforms (`/cases`, `/cases/[id]`). Screens navigate with `solito/navigation` (`useRouter`, `useParams`) and `solito/link`. Never with `next/navigation` or `expo-router` directly.
-- **Route files are thin:** `apps/frontend/src/app/(dashboard)/cases/page.tsx` and `apps/mobile/app/cases/index.tsx` only render `CasesListScreen` from `@vet-plan/app`.
-- **Styling:** React Native primitives + `className` (NativeWind). Web renders them through `react-native-web`. Brand colors come from `@vet-plan/tokens/theme.css`. Never hardcode hex.
-- **Server/Client boundary:** shared screens are client components. Mark the screen entry files `'use client'`. Next.js server components may fetch data and pass it as props.
-- **Platform splits:** use `*.web.tsx` / `*.native.tsx` file suffixes inside `packages/ui` when a primitive must differ by platform.
-- **Peer dependencies:** `packages/ui` and `packages/app` list `react`, `react-native`, `nativewind`, and `solito` as `peerDependencies` so each app supplies one copy.
-- **React version:** Expo SDK 58 ships React Native 0.88 (React ^19.3). Keep `react` and `react-dom` in `apps/frontend` on the same minor as the Expo SDK.
+### 4.2 How className works on each platform
+| | Native (Expo) | Web (Next.js) |
+|---|---|---|
+| Engine | NativeWind v5 (`react-native-css`) compiles `src/global.css` through Metro into style objects | Tailwind v4 (`@tailwindcss/turbopack`) compiles `globals.css` into real CSS |
+| `className` on RN components | Handled by NativeWind | `react-native` is aliased to `@vet-plan/ui/react-native-web-shim`, which forwards `className` to react-native-web as a compiled style (`{ $$css: true }`) → DOM class |
+| Shared sources scanned via | `@source` in `apps/mobile/src/global.css` | `@source` in `apps/frontend/src/app/globals.css` |
+| Cascade | Utilities unlayered (NativeWind recommendation) | `@layer rnw, theme, base;` + unlayered utilities, so Tailwind beats react-native-web's base styles; RNW's SSR styles (`styles-provider.tsx`) sit in the lowest layer |
 
-### 4.3 Versions & Decisions (as of 2026-10)
+NativeWind v5 has no Next.js/Turbopack integration yet ("Other Bundlers: coming soon"), hence the shim. When it ships one, the shim can be replaced without touching shared code.
+
+### 4.3 Rules
+- **Routing:** URLs are identical on both platforms (`/`, `/cases`). Shared screens navigate only with `Link` from `@vet-plan/app`. Each app injects its router link via `NavigationProvider` (`apps/frontend/src/app/navigation-provider.tsx`, `apps/mobile/src/navigation.tsx`). Add an imperative `useRouter` the same way when a screen needs one.
+- **Route files are thin:** `apps/frontend/src/app/(dashboard)/cases/page.tsx` and `apps/mobile/src/app/cases.tsx` only render `CasesScreen` from `@vet-plan/app`.
+- **Platform-specific UI** goes in slots/props (e.g. `HomeScreen`'s `session` prop, filled by the web page with the cookie-based session panel) or in `*.native.tsx` overrides inside shared packages (shared file = web version; Metro picks `.native.tsx` first).
+- **Styling:** React Native primitives (`View`, `Text`, `Pressable`, …) + `className`. Brand colors via `@vet-plan/tokens`. Never hardcode hex. Avoid DOM elements in shared packages.
+- **Server/Client boundary:** shared screens/providers are client components (`'use client'` at the top of each file). Next.js server components may fetch data and pass it as props or slots.
+- **Data:** shared screens call the backend through `useApiClient()` (`ApiProvider` in each app's root layout: web passes `API_URL`, mobile `EXPO_PUBLIC_API_URL`). The backend allows CORS only from `APP_URL`.
+- **One React, one React Native:** Expo SDK 58 pins React 19.3.0 / React Native 0.88.0. `apps/frontend` and the shared packages' peer ranges MUST match exactly (Expo does not support duplicates). Upgrade Expo first, then align Next's React.
+- **Mobile dependencies:** add them with `pnpm --filter @vet-plan/mobile exec expo install <pkg>` so versions match the SDK.
+
+### 4.3.1 Versions & Decisions (as of 2026-10)
 | Tool | Version | Note |
 |---|---|---|
-| `solito` | 5.0.0 | Web-first; no `react-native-web` requirement inside Solito itself |
-| `expo` / `expo-router` | SDK 58 | React Native 0.88 |
-| `nativewind` | 5.0.0-rc.0 (pin exact) | v5 runs on Tailwind v4 (same as web). Fallback: 4.2.x stable, which requires Tailwind v3 in `apps/mobile` only |
-| `react-native-web` | 0.21.x | Needed by `apps/frontend` to render `packages/ui` |
+| `expo` / `expo-router` | SDK 58 | React Native 0.88, React 19.3.0 |
+| `nativewind` + `react-native-css` | `5.0.0-rc.0` + `3.1.0-rc.0` (exact pair) | Tailwind `4.1.12` in `apps/mobile`; `lightningcss` pinned to `1.30.1` for the mobile toolchain via scoped `overrides` in `pnpm-workspace.yaml` |
+| `react-native-web` | 0.21.x | Renders `packages/ui` / `packages/app` in Next.js |
+| `solito` | **not used** | Solito 5.0.0 drives navigation through `@react-navigation/native`; Expo Router 58 replaced it with a vendored fork (no `getActionFromState`), so Solito links can't reach Expo Router's navigator. `NavigationProvider` + `Link` implement the same idea with no router dependency; revisit when Solito supports Expo Router 58. |
 
 ### 4.4 DICOM Canvas
 - The surgical math stays in `@vet-plan/shared` and runs on both platforms.

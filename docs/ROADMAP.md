@@ -18,14 +18,17 @@
 - [ ] Refresh tokens or sliding sessions (access tokens currently last `JWT_EXPIRES_IN`, default 24h).
 - [ ] Make exchange codes single-use (store the code id in Upstash Redis); today they expire after 60s.
 
-## Phase 2: Cross-Platform Frontend Foundation (Solito 5)
-Follow the READMEs in order. Each step should end with `pnpm build && pnpm lint` passing.
-- [ ] **2.1 `packages/ui`:** create the package (`packages/ui/README.md`), first primitive `Button` in brand colors.
-- [ ] **2.2 Web wiring:** add `react-native-web`, `nativewind`, `solito` to `apps/frontend`; configure `transpilePackages` + `react-native` alias in `next.config.ts`; render `Button` on the home page.
-- [ ] **2.3 `packages/app`:** create the package (`packages/app/README.md`), `HomeScreen` using `solito/link`, typed API client calling `GET /health`.
-- [ ] **2.4 `apps/mobile`:** bootstrap Expo SDK 58 (`apps/mobile/README.md`), NativeWind with `@vet-plan/tokens/theme.css`, route `/` rendering `HomeScreen`.
-- [ ] **2.5 Verify parity:** the same `HomeScreen` renders on web (`pnpm --filter @vet-plan/frontend dev`) and in Expo Go (`pnpm --filter @vet-plan/mobile dev`).
-- [ ] **2.6 Docs:** remove *(planned)* markers in `CLAUDE.md` and `docs/ARCHITECTURE.md`; replace the bootstrap READMEs with usage docs.
+## Phase 2: Cross-Platform Frontend Foundation
+- [x] **2.1 `packages/ui`:** `Button` (primary/outline, brand colors) + web `react-native` shim that forwards `className`.
+- [x] **2.2 Web wiring:** `react-native-web` in `apps/frontend`, `react-native` alias + `transpilePackages`, Tailwind layers/`@source`, SSR styles provider.
+- [x] **2.3 `packages/app`:** `HomeScreen` (API health badge, `Button`, link to `/cases`), `CasesScreen`, typed API client + `ApiProvider`, `NavigationProvider`/`Link`.
+- [x] **2.4 `apps/mobile`:** Expo SDK 58 + Expo Router, NativeWind v5 RC with `@vet-plan/tokens/theme.css`, routes `/` and `/cases` rendering the shared screens.
+- [x] **2.5 Verify parity:** web renders the shared screens (SSR + browser, health check over CORS); Android/iOS bundles compile the same classes to native styles (`expo export`).
+- [x] **2.6 Docs:** CLAUDE.md, ARCHITECTURE §4, package READMEs.
+- [ ] **On-device check:** `pnpm --filter @vet-plan/mobile dev`, open in Expo Go, confirm both screens and navigation (needs a phone; not verifiable in CI).
+- [ ] Mobile sign-in: `expo-auth-session` → backend OAuth → exchange code → `expo-secure-store`; inject the token into `createApiClient({ getAccessToken })`.
+- [ ] Replace Expo template icons/splash with the VP monogram.
+- [ ] Re-evaluate when NativeWind v5 goes stable (and ships a Next.js integration) or Solito supports Expo Router 58.
 
 ## Phase 3: Surgical Math Engine (`packages/shared`)
 - [ ] Create pure mathematical functions for TPLO angle calculation (MPTA, TPA).

@@ -1,19 +1,21 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { HomeScreen } from "@vet-plan/app";
 import { getCurrentUser } from "@/lib/session";
 
-// Placeholder home until ROADMAP Phase 2 replaces it with HomeScreen from @vet-plan/app
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 bg-brand-purple px-4 py-16 text-center">
-      <h1 className="text-4xl font-bold text-brand-yellow">Vet Plan</h1>
-      <Suspense fallback={<p className="text-brand-yellow/70">Loading…</p>}>
-        <SessionPanel />
-      </Suspense>
-    </main>
+    <HomeScreen
+      session={
+        <Suspense fallback={<p className="text-brand-yellow/70">Loading…</p>}>
+          <SessionPanel />
+        </Suspense>
+      }
+    />
   );
 }
 
+/** Web-only: the session lives in an HTTP-only cookie read on the server. */
 async function SessionPanel() {
   const user = await getCurrentUser();
 

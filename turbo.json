@@ -13,7 +13,8 @@
         },
         "lint": {
             "dependsOn": [
-                "^lint"
+                "^lint",
+                "^build"
             ]
         },
         "test": {
@@ -27,6 +28,11 @@
             ],
             "cache": false,
             "persistent": true
+        },
+        "typecheck": {
+            "dependsOn": [
+                "^build"
+            ]
         }
     }
 }

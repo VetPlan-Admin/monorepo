@@ -10,10 +10,19 @@ try {
 }
 
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // Shared packages ship TypeScript source
+  transpilePackages: ["@vet-plan/ui", "@vet-plan/app", "react-native-web"],
   turbopack: {
+    resolveAlias: {
+      // React Native primitives render through react-native-web, with `className` support
+      // added by our shim (NativeWind has no Next.js integration yet; see the shim's header)
+      "react-native": "@vet-plan/ui/react-native-web-shim",
+    },
+    // Shared files are the web version; `*.native.*` overrides them on mobile (Metro resolves
+    // those first). `*.web.*` is honoured too for packages that ship web-specific files.
+    resolveExtensions: [".web.tsx", ".web.ts", ".web.js", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

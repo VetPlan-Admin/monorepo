@@ -1,0 +1,13 @@
+/* NativeWind v5: keep utilities unlayered so they beat React Native Web defaults */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@import "nativewind/theme";
+
+/* Brand colors (bg-brand-purple, text-brand-yellow, ...) shared with apps/frontend */
+@import "@vet-plan/tokens/theme.css";
+
+/* Shared screens and components live outside this app */
+@source "../../../packages/ui/src";
+@source "../../../packages/app/src";

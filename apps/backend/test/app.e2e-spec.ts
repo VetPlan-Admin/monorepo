@@ -21,6 +21,14 @@ describe('App (e2e)', () => {
       .expect({ status: 'ok' });
   });
 
+  it('allows CORS from APP_URL only', async () => {
+    const allowed = await request(ctx.app.getHttpServer()).get('/health').set('Origin', 'http://app.test');
+    expect(allowed.headers['access-control-allow-origin']).toBe('http://app.test');
+
+    const blocked = await request(ctx.app.getHttpServer()).get('/health').set('Origin', 'http://evil.test');
+    expect(blocked.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('GET /cases rejects requests without a token', () => {
     return request(ctx.app.getHttpServer()).get('/cases').expect(401);
   });
