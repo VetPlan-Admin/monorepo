@@ -4,6 +4,7 @@ import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import type { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import type { TestingModuleBuilder } from '@nestjs/testing';
 import type { Role } from '@vet-plan/shared';
 import type { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
@@ -33,7 +34,9 @@ export interface TestContext {
 }
 
 /** Boots the full AppModule against a throwaway in-memory Postgres (PGlite) with migrations applied. */
-export async function createTestApp(): Promise<TestContext> {
+export async function createTestApp(
+    options: { overrides?: (builder: TestingModuleBuilder) => TestingModuleBuilder } = {},
+): Promise<TestContext> {
     const db = await PGlite.create();
     const server = new PGLiteSocketServer({ db, port: 0, maxConnections: 10 });
     await server.start();
@@ -42,7 +45,8 @@ export async function createTestApp(): Promise<TestContext> {
         DATABASE_URL: `postgres://postgres:postgres@${server.getServerConn()}/postgres`,
     });
 
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const builder = Test.createTestingModule({ imports: [AppModule] });
+    const moduleRef = await (options.overrides?.(builder) ?? builder).compile();
     const app = moduleRef.createNestApplication<INestApplication<App>>();
     configureApp(app);
     await app.init();

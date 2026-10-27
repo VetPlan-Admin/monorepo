@@ -29,6 +29,17 @@ describe('App (e2e)', () => {
     expect(blocked.headers['access-control-allow-origin']).toBeUndefined();
   });
 
+  it('serves Prometheus metrics outside production when no METRICS_TOKEN is set', async () => {
+    await request(ctx.app.getHttpServer()).get('/health').expect(200);
+    const res = await request(ctx.app.getHttpServer()).get('/metrics').expect(200);
+    expect(res.text).toContain('http_server_request_duration');
+    expect(res.text).toContain('http_route="/health"');
+  });
+
+  it('disables the Telegram webhook when the bot is not configured', () => {
+    return request(ctx.app.getHttpServer()).post('/ai-bot/telegram/webhook').send({}).expect(404);
+  });
+
   it('GET /cases rejects requests without a token', () => {
     return request(ctx.app.getHttpServer()).get('/cases').expect(401);
   });

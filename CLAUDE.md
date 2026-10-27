@@ -2,7 +2,7 @@
 
 ## 1. Project Overview & Architecture
 - **Product:** Vet Plan — Multi-tenant SaaS for veterinary orthopedic surgical planning.
-- **Cost Target:** $0/month operational costs utilizing free tiers (Neon Postgres, Upstash Redis, Grafana Cloud, Axiom, Gemini 2.5 Flash Free Tier).
+- **Cost Target:** $0/month operational costs utilizing free tiers (Neon Postgres, Upstash Redis, Grafana Cloud, Axiom, Cloudflare Workers AI with Groq as fallback).
 - **Structure:** `pnpm` monorepo containing:
   - `apps/frontend` (`@vet-plan/frontend`): Next.js 16 App Router + React 19, Tailwind CSS v4, Lucide Icons, `next-intl`. Read `apps/frontend/AGENTS.md` before writing Next.js code.
   - `apps/mobile` (`@vet-plan/mobile`): Expo SDK 58 + Expo Router + NativeWind v5 (RC). Read `apps/mobile/AGENTS.md` before writing Expo code.
@@ -26,6 +26,7 @@
 - **Test All:** `pnpm test` (backend e2e: `pnpm --filter @vet-plan/backend test:e2e`; surgical math with coverage: `pnpm --filter @vet-plan/shared test`; planner modules: `pnpm --filter @vet-plan/frontend test`)
 - **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (also `migration:generate src/migrations/<Name>`, `migration:revert`, `migration:show`). Register new migrations in `src/config/database.config.ts`.
 - **Local Postgres (no Docker):** `pnpm --filter @vet-plan/backend db:local` (PGlite on `127.0.0.1:5432`)
+- **Support bot webhook:** `pnpm --filter @vet-plan/backend telegram:set-webhook [public-url]` (after deploying)
 - **Ports:** frontend `3000`, backend `4000` (`APP_URL` / `API_URL` in `.env`), Expo dev server `8081`
 - **Mobile dependencies:** `pnpm --filter @vet-plan/mobile exec expo install <pkg>` (SDK-compatible versions)
 - **Editor tip:** apps consume `@vet-plan/shared` from its built `dist/`. After the shared package is rebuilt, the editor's TypeScript server can keep stale declarations ("has no exported member …") while `pnpm typecheck` passes: run **TypeScript: Restart TS Server**.
@@ -42,7 +43,8 @@
 - **Tenant Isolation:** every clinical query filters by `requireTenantId(user)`; records of other clinics return 404. Use `CLINICAL_ROLES` / `PLANNING_ROLES` from `@vet-plan/shared` in `@Roles(...)` (matrix: `docs/ARCHITECTURE.md` §1.3).
 - **Web Data Access:** client components reach the API only through `useApiClient()` → `/api/backend/*` proxy. Add new API areas to `PROXIED_PREFIXES` in `src/lib/backend-proxy.ts` deliberately.
 - **Cross-Platform Code:** `packages/ui` and `packages/app` MUST NOT import from `next/*`, `expo-*`, or app folders. Write React Native primitives (`View`, `Text`, `Pressable`) with `className`; navigate with `Link` from `@vet-plan/app`; call the backend with `useApiClient()`. Shared files must start with `'use client'`. Exactly one React (19.3.0) and React Native (0.88.0) version in the repo. Rules in `docs/ARCHITECTURE.md` §4.
-- **Telemetry:** Expose OpenTelemetry metrics via `/metrics` on NestJS; do NOT introduce proprietary paid SaaS SDKs.
+- **Telemetry:** OpenTelemetry metrics via `/metrics` on NestJS (instruments in `modules/telemetry/metrics.ts`, bearer `METRICS_TOKEN`); logs through Nest's `Logger` (JSON in production, shipped to Axiom). Talk to SaaS APIs with plain `fetch`; do NOT introduce proprietary paid SaaS SDKs.
+- **AI Usage:** call LLMs only through `LlmService` (OpenAI-compatible provider chain from env, `docs/ARCHITECTURE.md` §9). Run `redactPersonalData` on user text before any external call, never send patient/owner data, never let a model give clinical advice, and only use providers whose terms exclude training on our inputs (no Gemini free tier).
 - **Git Commit Style:** Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`).
 
 ## 5. Security Restrictions
@@ -114,16 +116,16 @@ vetplan-monorepo/
 │       │   │   ├── tenants/        # Tenant entity (clinic)
 │       │   │   ├── patients/       # Patient entity, service, controller (/patients)
 │       │   │   ├── cases/          # SurgicalCase + RadiographPlan entities, /cases API, report builder
-│       │   │   ├── ai-bot/         # (planned) Gemini 2.5 Flash Triage & Telegram Webhook
-│       │   │   └── telemetry/      # (planned) OpenTelemetry & Prometheus /metrics
+│       │   │   ├── ai-bot/         # Telegram support bot: redaction, LLM chain (Workers AI → Groq), triage, GitHub issues
+│       │   │   └── telemetry/      # OpenTelemetry metrics + /metrics, HTTP metrics middleware, AppLogger + Axiom shipper
 │       │   ├── common/             # ZodValidationPipe, requireTenantId, escapeLike
 │       │   ├── config/             # database.config.ts (entities, migrations) + data-source.ts (CLI)
 │       │   ├── migrations/         # TypeORM migrations (registered in database.config.ts)
 │       │   ├── app.module.ts
 │       │   ├── app.setup.ts        # Middleware shared by main.ts and e2e tests
-│       │   ├── tracing.ts          # (planned) OpenTelemetry Exporter Initialization
 │       │   └── main.ts
-│       ├── test/                   # e2e specs + utils/test-app.ts (PGlite-backed AppModule)
+│       ├── scripts/                # telegram-set-webhook.mjs
+│       ├── test/                   # e2e specs + utils/test-app.ts (PGlite-backed AppModule, provider overrides)
 │       └── package.json
 │
 ├── packages/                       # Shared Internal Workspace Packages

@@ -73,6 +73,14 @@ Reference: ARCHITECTURE §1.3 (permissions), §5 (data model), §8 (cases API & 
 - [ ] Audit trail for status changes and plan edits; optimistic concurrency for plan updates (two planners editing one plan).
 
 ## Phase 6: AI Support Bot & Observability
-- [ ] Build Telegram webhook handler in NestJS using Google AI Studio free Gemini API key.
-- [ ] Integrate `@octokit/rest` for automated GitHub Issue creation on reported bugs.
-- [ ] Expose `/metrics` endpoint with OpenTelemetry for Grafana Cloud & Axiom log streaming.
+Reference: ARCHITECTURE §3 (provider decision), §9 (bot), §10 (observability).
+- [x] **Decision:** replace the Gemini API free tier with Cloudflare Workers AI (primary) + Groq (fallback): free, no training on inputs, available worldwide, behind an OpenAI-compatible abstraction.
+- [x] Telegram webhook in NestJS (`/ai-bot/telegram/webhook`): secret-header auth, private chats only, `update_id` de-duplication, per-chat rate limit (Upstash REST, memory fallback), `/start` help.
+- [x] Personal-data redaction before any external call; Zod-validated LLM triage (category, severity, title, summary, reply) with provider fallback and a human-queue fallback; fixed replies for clinical questions and spam.
+- [x] `@octokit/rest` GitHub issues with category/severity/source labels and redacted body; `telegram:set-webhook` script.
+- [x] OpenTelemetry metrics at `/metrics` (HTTP, LLM, triage, issues), bearer-protected; JSON logs + Axiom shipping; unused SDKs removed (`@google/generative-ai`, `prom-client`, OTel auto-instrumentation).
+- [x] Tests: unit (redaction, JSON extraction, LLM client, Upstash/memory stores, Axiom shipper) and e2e with every external service faked (Workers AI, Groq, Telegram, GitHub), plus a production-mode smoke run.
+- [ ] **Your setup:** BotFather bot + `TELEGRAM_*`; Cloudflare API token with *Workers AI* permission + account id; Groq key; fine-grained GitHub token (Issues: write) on a **private** repo; Upstash database (REST URL/token); `METRICS_TOKEN` + Grafana Cloud Metrics Endpoint scrape; Axiom dataset + token. Then deploy and run `telegram:set-webhook`. Remove `GEMINI_API_KEY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `GRAFANA_CLOUD_API_KEY` and `REDIS_URL` from your `.env` (no longer used).
+- [ ] Link Telegram users to Vet Plan accounts (one-time code) so the team can answer and the bot can relay GitHub replies.
+- [ ] Answer "how do I…" questions from the docs (retrieval with Workers AI embeddings + Vectorize free tier) instead of only filing them.
+- [ ] Tracing (OpenTelemetry + ESM loader hooks) and a Grafana dashboard/alerts for error rate, latency and LLM fallback rate.

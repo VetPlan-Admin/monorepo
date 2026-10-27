@@ -54,10 +54,11 @@ Every query is scoped by the caller's `tenantId` (`requireTenantId`); records of
 
 ## 3. $0 Infrastructure Stack Boundary
 - Database: Neon Postgres (Free Tier)
-- Cache / Rate Limiting: Upstash Redis (Free Tier)
+- Cache / Rate Limiting: Upstash Redis (Free Tier), used over its REST API (no TCP client or SDK)
 - Backend Compute: GCP Cloud Run (2M free requests/month)
 - Frontend Hosting: Cloudflare Pages (Unlimited free bandwidth). Next.js 16 with `cacheComponents` needs a server runtime, so verify the OpenNext adapter on Cloudflare Workers before production.
-- AI Triaging: Google AI Studio (Gemini 2.5 Flash Free Tier). Free-tier prompts may be used by Google; strip patient/client identifiers before sending.
+- AI Triaging: **Cloudflare Workers AI** (free 10,000 neurons/day; Cloudflare doesn't train on or retain inputs), with **Groq** (free tier, no inference retention by default) as fallback. Personal data is redacted before any call (§9). *Decision (2026-10): replaced the Gemini API free tier, whose terms allow training on and human review of prompts and say not to send personal or confidential data, and which is unavailable to EEA/UK/Swiss users.*
+- Observability: Grafana Cloud (free) scrapes `GET /metrics`; Axiom (free) receives logs over HTTP; Cloud Logging keeps stdout JSON logs (§10).
 - Mobile builds: Expo Go and local builds are free; EAS Build free plan has a monthly build quota.
 - **Known non-zero costs (publishing only):** Apple Developer Program $99/year, Google Play $25 one-time.
 
@@ -178,3 +179,32 @@ plannerReducer (pure) ──points/parameters──▶ evaluateMeasurement (@vet
 ### 8.3 Web proxy (`/api/backend/*`)
 - `src/app/api/backend/[...path]/route.ts` → `proxyToBackend` (`src/lib/backend-proxy.ts`): forwards to `API_URL` with `Authorization: Bearer <vp_session>`; the token never reaches client JavaScript.
 - Only `health`, `auth/me`, `patients/**` and `cases/**` are forwarded (others → 404). Writes require `Origin` = the app's own origin (CSRF defence on top of `SameSite=Lax`). Only `Content-Type` and `Content-Disposition` are passed back; responses are `no-store`.
+
+## 9. AI Support Bot (Telegram → triage → GitHub)
+Module `apps/backend/src/modules/ai-bot/`. Disabled (webhook 404) until `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` are set.
+
+```
+Telegram ──POST /ai-bot/telegram/webhook (X-Telegram-Bot-Api-Secret-Token)──▶ Cloud Run (NestJS)
+   1. secret check (timing-safe) · private chats only · de-dup by update_id · rate limit per chat (Upstash)
+   2. redactPersonalData: emails, phones, CPF/CNPJ, card numbers, tokens → [EMAIL], [PHONE], …
+   3. LlmService: Workers AI ──(429 / error / invalid JSON)──▶ Groq ──(fails)──▶ human queue (fallback)
+   4. Zod-validated triage { category, severity, title, summary, reply }
+   5. GitHub issue (Octokit, private repo) for bug / feature_request / question / account / other
+   6. Reply in Telegram (+ "Ticket #N"); fixed replies for clinical questions, spam and fallback
+```
+- **Provider abstraction:** every LLM is called through one OpenAI-compatible `fetch` client (`llm/llm-provider.ts`); no vendor SDKs. The chain is built from env (`CLOUDFLARE_*`, `WORKERS_AI_MODEL`, `GROQ_*`). Free tiers change often (GitHub Models was retired and Cerebras became a trial in 2026), so switching provider must stay a configuration change.
+- **Structured output:** the prompt asks for JSON; Groq additionally gets a strict `json_schema` (gpt-oss models). Workers AI JSON mode is model-specific and best-effort, so it isn't requested; the response is parsed leniently (object, string, fenced or embedded JSON) and validated with `triageResultSchema`. Invalid output moves on to the next provider.
+- **Default models:** Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (~100 neurons per triage → ~100 free triages/day); switch `WORKERS_AI_MODEL` to `@cf/openai/gpt-oss-20b` (~35 neurons, ~280/day) or `@cf/qwen/qwen3-30b-a3b-fp8` (~16, ~600/day) for volume. Groq `openai/gpt-oss-20b` with `reasoning_effort: low`.
+- **Privacy:** redaction runs before text reaches the LLM, GitHub or logs (defence in depth: Telegram bot chats aren't end-to-end encrypted, and owners' names/phones are personal data under LGPD/GDPR). Issues reference chats by a salted hash, never the Telegram id. Logs carry metadata only (category, severity, issue number). Free-text names can't be detected, so the welcome message asks users not to send them.
+- **Safety:** support only. The prompt forbids clinical advice and treats the message as untrusted input; a `clinical_question` always gets a fixed decline, never the model's text. Severity `critical` covers wrong measurements, data loss and security.
+- **Cloud Run:** all work happens inside the webhook request (request-based billing throttles CPU after the response). The handler always answers 200 once authenticated, because a non-2xx makes Telegram retry.
+- **State:** `BotStore` = Upstash REST (`SET NX EX` for de-dup, `INCR`/`EXPIRE` for rate limits) shared by all instances; an in-memory fallback is used without Upstash (per instance, lost on restart). Store outages fail open.
+- **Setup:** create the bot with @BotFather; set the env keys (`.env.example`); deploy; run `pnpm --filter @vet-plan/backend telegram:set-webhook [public-url]`. For local testing, expose the API with a free tunnel (`cloudflared tunnel --url http://localhost:4000`).
+
+## 10. Observability
+- **Metrics:** OpenTelemetry SDK (`modules/telemetry/metrics.ts`) with a Prometheus exporter that doesn't open its own port; `GET /metrics` serves it through Nest. Requires `Authorization: Bearer $METRICS_TOKEN` when the token is set; without a token the endpoint only exists outside production (404 in production).
+  - `http_server_request_duration` (histogram, s): every response incl. guard rejections, labelled by method, route template and status (Express `finish` hook, `http-metrics.middleware.ts`).
+  - `vetplan_llm_request_duration` (histogram, s) by `provider` and `outcome` (`ok`, `rate_limited`, `http_error`, `invalid_output`, `unreachable`).
+  - `vetplan_support_triage_total` by `source` (`llm`/`fallback`) and `category`; `vetplan_support_github_issues_total` by `outcome`.
+- **Collection:** Grafana Cloud's Metrics Endpoint integration scrapes `/metrics` with the bearer token (pull fits Cloud Run: nothing runs in the background after a response). No auto-instrumentation yet: it needs ESM loader hooks (`--import`); add it with tracing if needed.
+- **Logs:** `AppLogger` (Nest `ConsoleLogger`) writes JSON lines in production, which Cloud Logging parses (free 50 GiB/month), and ships each entry to Axiom's HTTP ingest (`https://$AXIOM_DOMAIN/v1/ingest/$AXIOM_DATASET`, NDJSON) when configured. Batches flush at 100 events, after 2 s, and on SIGTERM (`enableShutdownHooks`). Never log message bodies or patient data.
