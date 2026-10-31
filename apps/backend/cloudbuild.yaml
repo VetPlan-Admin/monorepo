@@ -1,0 +1,78 @@
+# Backend pipeline (docs/DEPLOYMENT.md), run by a Cloud Build trigger on pushes to main:
+#   build image → push to Artifact Registry → run migrations (Cloud Run job) → deploy Cloud Run service.
+# A failed migration stops the pipeline before the new code is deployed.
+#
+# $0 guardrails (change only after reviewing docs/DEPLOYMENT.md "Free-tier guardrails"):
+#   default e2-standard-2 pool (2,500 free build-minutes/month) · scale to zero · max 2 instances ·
+#   request-based billing (--cpu-throttling) · no startup CPU boost · 1 vCPU / 512 MiB.
+substitutions:
+  _REGION: us-east4
+  _REPOSITORY: vet-plan
+  _SERVICE: vet-plan-api
+  _JOB: vet-plan-migrate
+  _SECRET: vet-plan-backend-env
+  _RUNTIME_SA: vet-plan-backend
+  _MAX_INSTANCES: '2'
+
+options:
+  # Required when the trigger runs as a user-specified service account
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=apps/backend/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/backend:${SHORT_SHA}
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: [push, '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/backend:${SHORT_SHA}']
+
+  - id: migrate
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - deploy
+      - ${_JOB}
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/backend:${SHORT_SHA}
+      - --region=${_REGION}
+      - --service-account=${_RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com
+      - --set-secrets=/secrets/backend.env=${_SECRET}:latest
+      - --set-env-vars=NODE_ENV=production,ENV_FILE=/secrets/backend.env
+      - --command=node
+      - --args=node_modules/typeorm/cli.js,migration:run,-d,dist/config/data-source.js
+      - --tasks=1
+      - --max-retries=0
+      - --task-timeout=300s
+      - --cpu=1
+      - --memory=512Mi
+      - --execute-now
+      - --wait
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/backend:${SHORT_SHA}
+      - --region=${_REGION}
+      - --service-account=${_RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com
+      - --set-secrets=/secrets/backend.env=${_SECRET}:latest
+      - --set-env-vars=NODE_ENV=production,ENV_FILE=/secrets/backend.env
+      - --allow-unauthenticated
+      - --port=8080
+      - --cpu=1
+      - --memory=512Mi
+      - --concurrency=80
+      - --timeout=60
+      - --min-instances=0
+      - --max-instances=${_MAX_INSTANCES}
+      - --cpu-throttling
+      - --no-cpu-boost

@@ -24,9 +24,10 @@
 - **Typecheck All:** `pnpm typecheck` (`pnpm lint` also type-checks mobile and the shared UI packages)
 - **Lint All:** `pnpm lint`
 - **Test All:** `pnpm test` (backend e2e: `pnpm --filter @vet-plan/backend test:e2e`; surgical math with coverage: `pnpm --filter @vet-plan/shared test`; planner modules: `pnpm --filter @vet-plan/frontend test`)
-- **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (also `migration:generate src/migrations/<Name>`, `migration:revert`, `migration:show`). Register new migrations in `src/config/database.config.ts`.
+- **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (also `migration:generate src/migrations/<Name>`, `migration:revert`, `migration:show`). Register new migrations in `src/config/database.config.ts`. They connect with `DATABASE_MIGRATION_URL` (Neon direct URL) when set, else `DATABASE_URL` (pooled).
 - **Local Postgres (no Docker):** `pnpm --filter @vet-plan/backend db:local` (PGlite on `127.0.0.1:5432`)
 - **Support bot webhook:** `pnpm --filter @vet-plan/backend telegram:set-webhook [public-url]` (after deploying)
+- **Deploy (backend):** push to `main` → Cloud Build trigger `backend-main` runs `apps/backend/cloudbuild.yaml` (build → migrate job → Cloud Run). Never build or deploy from a laptop; see `docs/DEPLOYMENT.md`.
 - **Ports:** frontend `3000`, backend `4000` (`APP_URL` / `API_URL` in `.env`), Expo dev server `8081`
 - **Mobile dependencies:** `pnpm --filter @vet-plan/mobile exec expo install <pkg>` (SDK-compatible versions)
 - **Editor tip:** apps consume `@vet-plan/shared` from its built `dist/`. After the shared package is rebuilt, the editor's TypeScript server can keep stale declarations ("has no exported member …") while `pnpm typecheck` passes: run **TypeScript: Restart TS Server**.
@@ -48,7 +49,8 @@
 - **Git Commit Style:** Conventional Commits (`feat(...)`, `fix(...)`, `chore(...)`).
 
 ## 5. Security Restrictions
-- NEVER commit secrets or `.env` files. Document new keys in `.env.example`.
+- NEVER commit secrets or `.env` files. Document new keys in `.env.example`. Production configuration lives only in the Secret Manager secret `vet-plan-backend-env` (`docs/DEPLOYMENT.md`); never put secrets in `cloudbuild.yaml`, Dockerfiles or Cloud Run plain env vars.
+- Keep the free-tier guardrails in `apps/backend/cloudbuild.yaml` (min 0 / max 2 instances, request-based billing, no CPU boost). Changing them requires reviewing `docs/DEPLOYMENT.md` and the budget.
 - ALWAYS maintain strict `.gitignore` rules for `node_modules`, `.pnpm-store`, build outputs, and `.env`.
 
 ## 6. Monorepo Directory Structure & File Blueprint
@@ -124,6 +126,9 @@ vetplan-monorepo/
 │       │   ├── app.module.ts
 │       │   ├── app.setup.ts        # Middleware shared by main.ts and e2e tests
 │       │   └── main.ts
+│       ├── Dockerfile              # Cloud Run image (built from the repo root)
+│       ├── cloudbuild.yaml         # Cloud Build: build → push → migrate job → deploy
+│       ├── deploy/gcp-setup.sh     # One-time GCP setup (Cloud Shell)
 │       ├── scripts/                # telegram-set-webhook.mjs
 │       ├── test/                   # e2e specs + utils/test-app.ts (PGlite-backed AppModule, provider overrides)
 │       └── package.json
@@ -140,7 +145,8 @@ vetplan-monorepo/
 │   ├── app/                        # Shared screens (home, cases), API client, useApiQuery, providers, Link
 │   └── config/                     # (planned) Shared ESLint, TS, Prettier Configs
 │
-├── docs/                           # ROADMAP.md, ARCHITECTURE.md, SURGICAL_MATH.md
+├── docs/                           # ROADMAP.md, ARCHITECTURE.md, SURGICAL_MATH.md, DEPLOYMENT.md, ZERO COST playbook
+├── .dockerignore                   # Backend image build context (no .env, no other apps' sources)
 ├── .env.example                    # Required environment keys (no values)
 ├── .gitignore                      # Strict Git exclusions
 ├── CLAUDE.md                       # AI Agent Guidelines & Architecture Specs
@@ -154,4 +160,7 @@ Refer to the following guides for execution steps and architecture details:
 - `docs/ROADMAP.md` — Phase-by-phase implementation checklist. Start here for "what's next".
 - `docs/ARCHITECTURE.md` — System design, security rules, cross-platform layering, and data model.
 - `docs/SURGICAL_MATH.md` — Definitions, landmarks, model assumptions, and references for every clinical measurement.
+- `docs/DEPLOYMENT.md` — Step-by-step cloud setup (Neon, GCP, Cloudflare) and the $0 free-tier guardrails.
+- `docs/ZERO COST - INFRASTRUCTURE AND DATABASE.md` — Reusable $0 playbook: every account, value and parameter (Neon, GCP, GitHub, Cloudflare, Upstash, Groq, Telegram, Axiom, Grafana, OAuth), region pairing and env var map.
+  **Rule:** any new research on providers, accounts, free-tier limits, pricing, regions or setup parameters MUST update this playbook in the same task (affected sections, "verified on" date, §9 sources).
 - `apps/mobile/README.md`, `packages/ui/README.md`, `packages/app/README.md` — How to run, extend, and test each cross-platform package.

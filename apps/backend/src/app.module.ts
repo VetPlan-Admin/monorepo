@@ -14,10 +14,11 @@ import { RolesGuard } from './modules/auth/guards/roles.guard.js';
 
 @Module({
   imports: [
-    // Looks for .env in apps/backend first, then the monorepo root. Tests set their own env.
+    // ENV_FILE: the secret Cloud Run mounts as a file (docs/DEPLOYMENT.md). Locally: apps/backend/.env,
+    // then the monorepo root .env. Already-set variables win. Tests set their own env.
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '../../.env'],
+      envFilePath: [...(process.env.ENV_FILE ? [process.env.ENV_FILE] : []), '.env', '../../.env'],
       ignoreEnvFile: process.env.NODE_ENV === 'test',
     }),
     TypeOrmModule.forRootAsync({

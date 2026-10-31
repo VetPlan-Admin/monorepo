@@ -53,10 +53,10 @@ Every query is scoped by the caller's `tenantId` (`requireTenantId`); records of
 | `packages/config` *(planned)* | Centralized ESLint, Prettier, TS base configs | — |
 
 ## 3. $0 Infrastructure Stack Boundary
-- Database: Neon Postgres (Free Tier)
+- Database: Neon Postgres (Free Tier), project in **AWS us-east-1 (N. Virginia)**
 - Cache / Rate Limiting: Upstash Redis (Free Tier), used over its REST API (no TCP client or SDK)
-- Backend Compute: GCP Cloud Run (2M free requests/month)
-- Frontend Hosting: Cloudflare Pages (Unlimited free bandwidth). Next.js 16 with `cacheComponents` needs a server runtime, so verify the OpenNext adapter on Cloudflare Workers before production.
+- Backend Compute: GCP Cloud Run in **us-east4 (N. Virginia, Tier 1)**, next to the database (2M free requests/month). Free tier is a spending-based discount at Tier 1 prices; Tier 2 regions (e.g. São Paulo) wouldn't stay at $0. Build, images, secrets and guardrails: `docs/DEPLOYMENT.md`.
+- Frontend Hosting: Cloudflare (free). Next.js 16 with `cacheComponents` needs a server runtime (OpenNext on Workers), and **Workers Free allows 10 ms CPU per request** (100k requests/day, 64 MiB bundle), so validate server rendering before production. Free fallback: the frontend as a second Cloud Run service. Reusable account/parameter playbook: `docs/ZERO COST - INFRASTRUCTURE AND DATABASE.md`.
 - AI Triaging: **Cloudflare Workers AI** (free 10,000 neurons/day; Cloudflare doesn't train on or retain inputs), with **Groq** (free tier, no inference retention by default) as fallback. Personal data is redacted before any call (§9). *Decision (2026-10): replaced the Gemini API free tier, whose terms allow training on and human review of prompts and say not to send personal or confidential data, and which is unavailable to EEA/UK/Swiss users.*
 - Observability: Grafana Cloud (free) scrapes `GET /metrics`; Axiom (free) receives logs over HTTP; Cloud Logging keeps stdout JSON logs (§10).
 - Mobile builds: Expo Go and local builds are free; EAS Build free plan has a monthly build quota.
@@ -127,6 +127,7 @@ NativeWind v5 has no Next.js/Turbopack integration yet ("Other Bundlers: coming 
 - `synchronize` is always off. Schema changes go through migrations:
   - `pnpm --filter @vet-plan/backend migration:generate src/migrations/<Name>` (diffs entities against `DATABASE_URL`)
   - `pnpm --filter @vet-plan/backend migration:run` / `migration:revert` / `migration:show`
+- **Neon connections:** the app uses the **pooled** URL (`DATABASE_URL`, host with `-pooler`, PgBouncer transaction mode), which suits many short-lived Cloud Run instances. The `migration:*` commands use `DATABASE_MIGRATION_URL`, the **direct** URL, when set, as Neon recommends for schema changes.
 - UUIDs use `gen_random_uuid()` (core Postgres 13+), so Neon needs no extensions.
 - **Local database without Docker:** `pnpm --filter @vet-plan/backend db:local` starts PGlite (real Postgres compiled to WASM) on `127.0.0.1:5432`, persisted in `apps/backend/.pglite/`. Use `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres`.
 - **Tests:** e2e tests boot the full `AppModule` against a throwaway in-memory PGlite with migrations applied (`test/utils/test-app.ts`). `NODE_ENV=test` makes `ConfigModule` ignore `.env`, so tests never touch Neon or real credentials.
@@ -208,3 +209,10 @@ Telegram ──POST /ai-bot/telegram/webhook (X-Telegram-Bot-Api-Secret-Token)�
   - `vetplan_support_triage_total` by `source` (`llm`/`fallback`) and `category`; `vetplan_support_github_issues_total` by `outcome`.
 - **Collection:** Grafana Cloud's Metrics Endpoint integration scrapes `/metrics` with the bearer token (pull fits Cloud Run: nothing runs in the background after a response). No auto-instrumentation yet: it needs ESM loader hooks (`--import`); add it with tracing if needed.
 - **Logs:** `AppLogger` (Nest `ConsoleLogger`) writes JSON lines in production, which Cloud Logging parses (free 50 GiB/month), and ships each entry to Axiom's HTTP ingest (`https://$AXIOM_DOMAIN/v1/ingest/$AXIOM_DATASET`, NDJSON) when configured. Batches flush at 100 events, after 2 s, and on SIGTERM (`enableShutdownHooks`). Never log message bodies or patient data.
+
+## 11. Deployment
+Step-by-step and $0 guardrails: `docs/DEPLOYMENT.md`.
+- **No local builds or runs:** Cloud Build builds `apps/backend/Dockerfile` from the repo root on pushes to `main` that touch the backend, then runs migrations as the Cloud Run job `vet-plan-migrate` and deploys the service `vet-plan-api`. A failed migration stops the deploy.
+- **Image:** `pnpm deploy --prod` bundle of `@vet-plan/backend` (+ `@vet-plan/shared`), `node:24.22.0-slim`, non-root. The same image runs the service (`node dist/main.js`) and the migration job (TypeORM CLI).
+- **Configuration:** one Secret Manager secret (`vet-plan-backend-env`, KEY=value lines) mounted at `/secrets/backend.env`. `ENV_FILE` points `ConfigModule` and the migration CLI at it (one secret version instead of ~14: the free tier allows 6 active versions). Already-set environment variables win.
+- **Identities:** Cloud Run runs as `vet-plan-backend` (secret accessor on that one secret). Cloud Build runs as `vet-plan-deployer` (Cloud Run admin, Artifact Registry writer, log writer, may act as the runtime account). No keys are downloaded.

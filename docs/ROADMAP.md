@@ -84,3 +84,17 @@ Reference: ARCHITECTURE §3 (provider decision), §9 (bot), §10 (observability)
 - [ ] Link Telegram users to Vet Plan accounts (one-time code) so the team can answer and the bot can relay GitHub replies.
 - [ ] Answer "how do I…" questions from the docs (retrieval with Workers AI embeddings + Vectorize free tier) instead of only filing them.
 - [ ] Tracing (OpenTelemetry + ESM loader hooks) and a Grafana dashboard/alerts for error rate, latency and LLM fallback rate.
+
+## Phase 7: Production Readiness
+Reference: `docs/DEPLOYMENT.md` (step-by-step, $0 guardrails) and `docs/ZERO COST - INFRASTRUCTURE AND DATABASE.md` (reusable account/parameter playbook).
+- [x] Step 1: Neon project `vet-plan` in AWS us-east-1 (pooled URL for the app, direct URL for migrations).
+- [x] Deployment as code: `apps/backend/Dockerfile` (pnpm deploy bundle, non-root), `.dockerignore`, `apps/backend/cloudbuild.yaml` (build → push → migrate job → deploy), `apps/backend/deploy/gcp-setup.sh` (Cloud Shell), config from one mounted secret (`ENV_FILE`).
+- [ ] Step 2: GCP account, $1 budget alert, project, setup script, secret, GitHub trigger, first deploy (us-east4).
+- [ ] Step 3: Cloudflare: deploy the frontend and create the Workers AI token; set `APP_URL` / `API_URL`. **Validate first:** Workers Free allows 10 ms CPU per request, which Next.js server rendering (OpenNext) may exceed. Free fallback: run the frontend on Cloud Run as a second service.
+- [ ] Step 4: Google OAuth client with production callback URLs (then LinkedIn/Facebook if wanted).
+- [ ] Step 5: Bot and observability keys (Telegram, Groq, GitHub issues token, Upstash, `METRICS_TOKEN`, Axiom, Grafana scrape).
+- [ ] CI on pull requests (GitHub Actions: build, lint, typecheck, tests) before merging to `main`.
+- [ ] Clinic invitations; refresh tokens + single-use exchange codes; API rate limiting (Upstash).
+- [ ] Playwright end-to-end tests in the repo (planner and case flows), run in CI.
+- [ ] Portuguese translations (`next-intl`); LGPD documents (privacy policy, terms, data-processing agreement).
+- [ ] Free trial ends after 90 days: *Activate full account* to keep services (free tier still applies).

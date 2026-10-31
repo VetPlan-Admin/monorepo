@@ -1,0 +1,24 @@
+# Docker build context for apps/backend/Dockerfile (built from the repo root).
+# Secrets never enter an image: configuration comes from the mounted Secret Manager file.
+.env
+.env.*
+**/.env
+**/.env.*
+.git
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.expo
+**/.pglite
+**/*.tsbuildinfo
+docs
+# Other workspace packages: only their package.json is needed (pnpm reads the whole workspace)
+apps/frontend/*
+!apps/frontend/package.json
+apps/mobile/*
+!apps/mobile/package.json
+packages/app/*
+!packages/app/package.json
+packages/ui/*
+!packages/ui/package.json
