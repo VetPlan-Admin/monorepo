@@ -89,6 +89,7 @@ Reference: ARCHITECTURE §3 (provider decision), §9 (bot), §10 (observability)
 Reference: `docs/DEPLOYMENT.md` (step-by-step, $0 guardrails) and `docs/ZERO COST - INFRASTRUCTURE AND DATABASE.md` (reusable account/parameter playbook).
 - [x] Step 1: Neon project `vet-plan` in AWS us-east-1 (pooled URL for the app, direct URL for migrations).
 - [x] Deployment as code: `apps/backend/Dockerfile` (pnpm deploy bundle, non-root), `.dockerignore`, `apps/backend/cloudbuild.yaml` (build → push → migrate job → deploy), `apps/backend/deploy/gcp-setup.sh` (Cloud Shell), config from one mounted secret (`ENV_FILE`).
+- [x] Local stack without `.env`: `compose.yaml` (Postgres 18 → migrations → API → web, `apps/frontend/Dockerfile`) and a dev-only login (`/auth/dev/*`, needs `DEV_LOGIN_ENABLED=true` + development/test `NODE_ENV`, 404 otherwise; e2e-tested).
 - [ ] Step 2: GCP account, $1 budget alert, project, setup script, secret, GitHub trigger, first deploy (us-east4).
 - [ ] Step 3: Cloudflare: deploy the frontend and create the Workers AI token; set `APP_URL` / `API_URL`. **Validate first:** Workers Free allows 10 ms CPU per request, which Next.js server rendering (OpenNext) may exceed. Free fallback: run the frontend on Cloud Run as a second service.
 - [ ] Step 4: Google OAuth client with production callback URLs (then LinkedIn/Facebook if wanted).
@@ -97,4 +98,4 @@ Reference: `docs/DEPLOYMENT.md` (step-by-step, $0 guardrails) and `docs/ZERO COS
 - [ ] Clinic invitations; refresh tokens + single-use exchange codes; API rate limiting (Upstash).
 - [ ] Playwright end-to-end tests in the repo (planner and case flows), run in CI.
 - [ ] Portuguese translations (`next-intl`); LGPD documents (privacy policy, terms, data-processing agreement).
-- [ ] Free trial ends after 90 days: *Activate full account* to keep services (free tier still applies).
+- [ ] GCP free trial ends 90 days after signup. By day 80, either let it close ($0; resources stop) or add the billing kill switch (budget → Pub/Sub → function that unlinks billing, reusing the backend image so it adds no stored image) and only then *Activate* (`docs/DEPLOYMENT.md`, "GCP free trial end").

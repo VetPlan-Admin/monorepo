@@ -18,6 +18,8 @@ interface ExchangeCodePayload {
 export class AuthService {
     private readonly accessTokenTtl: number;
 
+    private readonly appUrl: string;
+
     constructor(
         private readonly jwtService: JwtService,
         private readonly usersService: UsersService,
@@ -25,6 +27,7 @@ export class AuthService {
     ) {
         const ttl = Number(configService.get<string>('JWT_EXPIRES_IN'));
         this.accessTokenTtl = Number.isInteger(ttl) && ttl > 0 ? ttl : DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
+        this.appUrl = configService.get<string>('APP_URL', 'http://localhost:3000');
     }
 
     issueAccessToken(user: User): AccessTokenResponseDto {
@@ -43,6 +46,13 @@ export class AuthService {
     issueExchangeCode(user: User): string {
         const payload: ExchangeCodePayload = { sub: user.id, typ: 'exchange' };
         return this.jwtService.sign(payload, { expiresIn: EXCHANGE_CODE_TTL_SECONDS });
+    }
+
+    /** Where a completed sign-in (OAuth or dev login) sends the browser: the web app's code exchange route. */
+    webCallbackUrl(user: User): string {
+        const callbackUrl = new URL('/auth/callback', this.appUrl);
+        callbackUrl.searchParams.set('code', this.issueExchangeCode(user));
+        return callbackUrl.toString();
     }
 
     async exchangeCode(code: string): Promise<AccessTokenResponseDto> {

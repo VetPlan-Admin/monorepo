@@ -23,6 +23,12 @@ Next.js server components ──GET /auth/me (Bearer from cookie)──▶ Backe
 - A provider without credentials in `.env` is disabled: its button sends users back to `/login?error=provider_unavailable`.
 - OAuth routes are browser-facing: errors redirect to `APP_URL/login?error=…` (`OAuthRedirectFilter`) instead of returning JSON.
 - The token never reaches client-side JavaScript. The browser only talks to the backend for the OAuth redirects.
+- The browser-facing backend URL is `PUBLIC_API_URL` (defaults to `API_URL`). They differ only when the web server reaches the backend on a private address (Docker Compose: `http://backend:4000`). The provider links are prerendered, so set it at build time.
+
+**Dev login (local development only).** `GET /auth/dev/login/:role` finds or creates a fixed user per role (`dev-<role>@vetplan.invalid`). Clinic roles share the tenant *Dev Clinic (local)*; `SUPER_ADMIN` gets none. It then redirects to `APP_URL/auth/callback?code=…`, so the rest of the flow (exchange, cookie) is the production path unchanged. `GET /auth/dev/roles` lists the roles for the login page.
+- **Two switches, both required:** `DEV_LOGIN_ENABLED=true` **and** `NODE_ENV` ∈ {`development`, `test`}. Otherwise every `/auth/dev/*` route answers the same 404 as a missing route (`DevLoginGuard`). Cloud Run always runs with `NODE_ENV=production`, so the dev login can't be on there even if the flag leaks into the secret.
+- The web app shows *Development sign-in* only when its own `DEV_LOGIN_ENABLED=true` (read per request) and the backend answers `/auth/dev/roles`. The backend logs a warning at startup when the dev login is on.
+- Only `compose.yaml` enables it, with ports bound to `127.0.0.1`. Tests: `apps/backend/test/dev-login.e2e-spec.ts`.
 
 ### 1.2 Setup Checklist
 1. `.env` (root): `JWT_SECRET` (long random string), `API_URL=http://localhost:4000`, `APP_URL=http://localhost:3000`, provider credentials, `DATABASE_URL`.
@@ -215,4 +221,5 @@ Step-by-step and $0 guardrails: `docs/DEPLOYMENT.md`.
 - **No local builds or runs:** Cloud Build builds `apps/backend/Dockerfile` from the repo root on pushes to `main` that touch the backend, then runs migrations as the Cloud Run job `vet-plan-migrate` and deploys the service `vet-plan-api`. A failed migration stops the deploy.
 - **Image:** `pnpm deploy --prod` bundle of `@vet-plan/backend` (+ `@vet-plan/shared`), `node:24.22.0-slim`, non-root. The same image runs the service (`node dist/main.js`) and the migration job (TypeORM CLI).
 - **Configuration:** one Secret Manager secret (`vet-plan-backend-env`, KEY=value lines) mounted at `/secrets/backend.env`. `ENV_FILE` points `ConfigModule` and the migration CLI at it (one secret version instead of ~14: the free tier allows 6 active versions). Already-set environment variables win.
+- **Local stack:** `compose.yaml` runs Postgres 18 → the same backend image as the migration job → the API → the web app (`apps/frontend/Dockerfile`, local only). Values are throwaway defaults inline (no `.env`, no `${…}` interpolation). The dev login is on (§1.1), with ports bound to `127.0.0.1`.
 - **Identities:** Cloud Run runs as `vet-plan-backend` (secret accessor on that one secret). Cloud Build runs as `vet-plan-deployer` (Cloud Run admin, Artifact Registry writer, log writer, may act as the runtime account). No keys are downloaded.

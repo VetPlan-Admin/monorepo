@@ -12,7 +12,8 @@ for Vet Plan. Reuse it for another app by replacing the placeholders in §2.
 
 ## 0. Rules that keep it at $0
 1. **Budgets don't stop spending; they only alert.** The real protection is configuration: scale to zero,
-   capped instances, request-based billing, image cleanup, one bundled secret (§4.4).
+   capped instances, request-based billing, image cleanup, one bundled secret (§4.4). On GCP, the Free
+   Trial makes charges impossible for 90 days; after upgrading, only a billing kill switch is a hard stop.
 2. Prefer providers that **block or error** at the free limit over ones that bill overage (Workers AI,
    Neon, Upstash, GitHub Actions without a card all stop or error).
 3. **Secrets never go into chat, the repo, Dockerfiles or build files.** They go straight from the
@@ -31,7 +32,7 @@ for Vet Plan. Reuse it for another app by replacing the placeholders in §2.
 | 1 | Password manager (e.g. Bitwarden) | Holding every secret below | Free | No | Email | — |
 | 2 | **GitHub** | Code, Cloud Build source, support issues, CI | Free | No | — | Private repos: $12/month Actions credit (~2,000 Linux min); usage **blocked** at the limit without a card; public repos free |
 | 3 | **Neon** | Postgres | Free (permanent) | No | GitHub | 1 GB/project, 100 CU-h/project/month, ≤2 CU, sleeps after 5 min (wakes in ~ms), 6 h restore window, 100 projects |
-| 4 | **Google Cloud (GCP)** | API (Cloud Run), builds, images, secrets, OAuth client | Free trial → free tier | **Yes** (trial: not charged) | Google account | See §4.4 |
+| 4 | **Google Cloud (GCP)** | API (Cloud Run), builds, images, secrets, OAuth client | Free trial → free tier | **Yes** (identity only; $0–1 hold, released) | Google account | See §4.4 |
 | 5 | **Cloudflare** | Frontend hosting, Workers AI (LLM) | Free | No | Email | Workers: 100k req/day, **10 ms CPU/request**, 64 MiB bundle; Workers AI: 10,000 neurons/day (errors when exhausted) |
 | 6 | Upstash | Redis over REST (rate limits, de-dup) | Free | No | GitHub/Google | 1 DB, 500K commands/month, 250 MB, 10 GB bandwidth |
 | 7 | Groq | LLM fallback | Free | No | Google/GitHub | ~30 req/min, ~1,000 req/day per model (exact limits in the console) |
@@ -110,9 +111,11 @@ One entry per secret, named `<APP> · <KEY>` (e.g. `vet-plan · DATABASE_URL`). 
 **A. Account and budget**
 | Item | Value |
 |---|---|
-| Sign up | https://console.cloud.google.com → **Start free** ($300 / 90-day trial; card for identity, not charged) |
-| Budget | *Billing → Budgets & alerts*: name `<APP>-zero`, all projects/services, **$1**, alerts 50/90/100 % actual + 100 % forecast, email billing admins |
-| Trial end | After 90 days: *Billing → Activate full account* to keep services (free tier still applies) |
+| Sign up | https://console.cloud.google.com → **Start free**: $300 credit / 90 days. Card (or other method) for identity and fraud checks only; a pending $0–1 authorization hold is released. Eligible only if never paid for Google Cloud, Maps or Firebase and no previous trial. Account type **Individual** |
+| Why it's $0 | *"You will not be billed for any Google Cloud usage during your Free Trial"*, no automatic charges. Free Tier applies during the trial and doesn't use the credit. Credit exhausted or day 90 → account closes, resources stop, nothing billed |
+| Never | Click **Activate / Upgrade** before the kill switch exists (it's the only step that allows charges) |
+| Budget | *Billing → Budgets & alerts*: name `<APP>-zero`, **Monthly**, all projects/services, Savings: **untick Promotional credits** (trial credit hides spend), **keep Free tier credits**; specified amount 1 USD (or equivalent), thresholds 50/90/100 % actual + 100 % forecast, email billing admins and users |
+| Trial end (decide by day 80) | *Let it close*: resources stop, 30-day grace to upgrade, then deleted ($0). *Keep running*: kill switch first (budget → Pub/Sub topic → function that unlinks billing; needs Project Billing Manager + Browser on the project), then *Activate*. Notifications arrive several times a day and can lag hours, so it caps a runaway, not to exactly $0; unlinking stops all services (free ones too) and may delete resources |
 
 **B. Project and APIs** (Cloud Shell: `apps/backend/deploy/gcp-setup.sh`)
 | Item | Value |
@@ -283,6 +286,9 @@ Everything in `<SECRET>` is one file = **one** secret version, whatever the numb
 - `apps/backend/cloudbuild.yaml` (build → push → migration job → deploy, guardrail flags).
 - `apps/backend/deploy/gcp-setup.sh` (APIs, registry + cleanup, service accounts, secret access).
 - Graceful shutdown (`enableShutdownHooks`), JSON logs in production, no background work after a response.
+- Optional local stack with no `.env` and no cloud account: `compose.yaml` (Postgres → migration job → API → web)
+  plus a dev-only login that needs `DEV_LOGIN_ENABLED=true` and a non-production `NODE_ENV`. Postgres 18+ images
+  mount their volume at `/var/lib/postgresql` (not `/data`); bind ports to `127.0.0.1`.
 
 ---
 
@@ -293,13 +299,13 @@ Everything in `<SECRET>` is one file = **one** secret version, whatever the numb
 - [ ] Cloud Run: still `min 0 / max 2`, request-based billing, no CPU boost.
 - [ ] Neon: compute hours on the project dashboard well under 100 CU-h.
 - [ ] Workers AI / Groq: fallback-rate metric (`vetplan_llm_request_duration{outcome}`) not dominated by `rate_limited`.
-- [ ] Free trial: activate the full account before day 90.
+- [ ] GCP trial day 80: let it close ($0), or add the kill switch and only then *Activate*.
 
 ---
 
 ## 9. Sources (verified 2026-10-31)
 - Neon: [pricing](https://neon.com/pricing) · [regions](https://neon.com/docs/introduction/regions) · [connection pooling](https://neon.com/docs/connect/connection-pooling) · [roles](https://neon.com/docs/manage/roles)
-- GCP: [Cloud Run pricing & tiers](https://cloud.google.com/run/pricing) · [Cloud Build pricing](https://cloud.google.com/build/pricing) · [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing) · [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing) · [Free Program](https://docs.cloud.google.com/free/docs/free-cloud-features)
+- GCP: [Cloud Run pricing & tiers](https://cloud.google.com/run/pricing) · [Cloud Build pricing](https://cloud.google.com/build/pricing) · [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing) · [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing) · [Free Program (trial + free tier)](https://docs.cloud.google.com/free/docs/free-cloud-features) · [Budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Budget Pub/Sub notifications](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications) · [Disable billing with notifications (kill switch)](https://docs.cloud.google.com/billing/docs/how-to/disable-billing-with-notifications) · [Unlink billing: roles](https://docs.cloud.google.com/billing/docs/how-to/modify-project)
 - Cloudflare: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) · [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) · [Workers AI data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/) · [OpenAI-compatible API](https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/)
 - GitHub: [Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 - Upstash: [Redis pricing](https://upstash.com/pricing/redis) · Groq: [rate limits](https://console.groq.com/docs/rate-limits), [your data](https://console.groq.com/docs/your-data)

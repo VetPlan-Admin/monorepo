@@ -1,4 +1,5 @@
 # Docker build context for apps/backend/Dockerfile (built from the repo root).
+# apps/frontend/Dockerfile has its own: apps/frontend/Dockerfile.dockerignore (BuildKit).
 # Secrets never enter an image: configuration comes from the mounted Secret Manager file.
 .env
 .env.*

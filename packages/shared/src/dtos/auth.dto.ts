@@ -22,3 +22,11 @@ export interface CurrentUserDto {
     role: Role;
     tenant: { id: string; name: string } | null;
 }
+
+/**
+ * Response of `GET /auth/dev/roles`: the roles the local development sign-in offers.
+ * The endpoint answers 404 unless dev login is switched on, and never in production.
+ */
+export interface DevLoginOptionsDto {
+    roles: Role[];
+}

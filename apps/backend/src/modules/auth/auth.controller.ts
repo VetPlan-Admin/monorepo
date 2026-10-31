@@ -1,5 +1,4 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Post, Req, Res, UseFilters, UseGuards } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ALL_ROLES } from '@vet-plan/shared';
 import type { AccessTokenResponseDto, CurrentUserDto, ExchangeCodeRequestDto } from '@vet-plan/shared';
 import type { Request, Response } from 'express';
@@ -14,10 +13,7 @@ import type { AuthenticatedUser } from './strategies/jwt.strategy.js';
 
 @Controller('auth')
 export class AuthController {
-    constructor(
-        private readonly authService: AuthService,
-        private readonly configService: ConfigService,
-    ) { }
+    constructor(private readonly authService: AuthService) { }
 
     /** Step 1: redirect the browser to the provider's consent screen (done by OAuthGuard). */
     @Public()
@@ -36,9 +32,7 @@ export class AuthController {
     oauthCallback(@Req() request: Request, @Res() response: Response): void {
         // Set by the provider strategy's validate() → UsersService.findOrCreateFromOAuth
         const user = request.user as User;
-        const callbackUrl = new URL('/auth/callback', this.configService.get<string>('APP_URL', 'http://localhost:3000'));
-        callbackUrl.searchParams.set('code', this.authService.issueExchangeCode(user));
-        response.redirect(302, callbackUrl.toString());
+        response.redirect(302, this.authService.webCallbackUrl(user));
     }
 
     /** Step 3: the frontend server swaps the code for an access token (server-to-server). */

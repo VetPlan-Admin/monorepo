@@ -25,6 +25,7 @@
 - **Lint All:** `pnpm lint`
 - **Test All:** `pnpm test` (backend e2e: `pnpm --filter @vet-plan/backend test:e2e`; surgical math with coverage: `pnpm --filter @vet-plan/shared test`; planner modules: `pnpm --filter @vet-plan/frontend test`)
 - **Database Migrations:** `pnpm --filter @vet-plan/backend migration:run` (also `migration:generate src/migrations/<Name>`, `migration:revert`, `migration:show`). Register new migrations in `src/config/database.config.ts`. They connect with `DATABASE_MIGRATION_URL` (Neon direct URL) when set, else `DATABASE_URL` (pooled).
+- **Local full stack (Docker, no `.env`):** `docker compose up --build` → http://localhost:3000 → *Development sign-in* (Postgres 18 → migrations → API → web; `compose.yaml`). `docker compose down -v` also drops the database.
 - **Local Postgres (no Docker):** `pnpm --filter @vet-plan/backend db:local` (PGlite on `127.0.0.1:5432`)
 - **Support bot webhook:** `pnpm --filter @vet-plan/backend telegram:set-webhook [public-url]` (after deploying)
 - **Deploy (backend):** push to `main` → Cloud Build trigger `backend-main` runs `apps/backend/cloudbuild.yaml` (build → migrate job → Cloud Run). Never build or deploy from a laptop; see `docs/DEPLOYMENT.md`.
@@ -36,6 +37,7 @@
 - **TypeScript:** Strict mode enabled. No `any` casts without explicit justification.
 - **ESM Imports:** `apps/backend`, `packages/shared`, and `packages/tokens` compile with `nodenext`. Relative imports MUST end in `.js` (`./cases.module.js`). Package imports NEVER get an extension (`@vet-plan/shared`, not `@vet-plan/shared.js`). Next.js and Expo code uses bundler resolution and needs no extensions.
 - **Backend Auth:** Social login via Passport (Google, LinkedIn OIDC, Facebook) + JWT. `JwtAuthGuard` and `RolesGuard` are global and deny by default: every route MUST declare `@Roles(...)` or `@Public()`. Do NOT add `@UseGuards(JwtAuthGuard, RolesGuard)` to controllers. Read the caller with `@CurrentUser()` and scope tenant data by its `tenantId`. Flow: `docs/ARCHITECTURE.md` §1.1.
+- **Dev Login:** `/auth/dev/*` (`DevLoginController`) signs anyone in with any role, so it answers 404 unless `DEV_LOGIN_ENABLED=true` AND `NODE_ENV` is `development`/`test` (`DevLoginGuard`). Only `compose.yaml` turns it on. Never put `DEV_LOGIN_ENABLED` in the production secret, never relax the `NODE_ENV` check, and keep compose ports bound to `127.0.0.1`.
 - **Frontend Auth:** the access token lives only in the HTTP-only `vp_session` cookie. Read the user with `getCurrentUser()` from `src/lib/session.ts` inside a `<Suspense>` boundary (Cache Components). Never expose the token to client components.
 - **Surgical Math:** all clinical measurements live in `packages/shared/src/math/` and nowhere else (no angle maths in components or services). Inputs are image-pixel `Point2D` landmarks, outputs degrees/mm; invalid input throws `RangeError`. Coverage MUST stay at 100%, and formula or default changes MUST update `docs/SURGICAL_MATH.md`.
 - **Measurements in UIs:** canvases and screens call `evaluateMeasurement` from `@vet-plan/shared` and render its overlay/values; they never compute clinical values themselves. A new measurement = a protocol definition in `packages/shared/src/measurements/definitions.ts` + tests + a row in `docs/SURGICAL_MATH.md` §3.
@@ -97,6 +99,7 @@ vetplan-monorepo/
 │   │   │   └── types/              # Ambient declarations (jpeg-lossless-decoder-js)
 │   │   ├── public/                 # Monogram Logos & Static Assets
 │   │   ├── next.config.ts          # react-native → @vet-plan/ui shim alias, transpilePackages
+│   │   ├── Dockerfile              # Local Docker stack image (+ Dockerfile.dockerignore); production is Cloudflare
 │   │   └── package.json
 │   │
 │   ├── mobile/                     # Expo SDK 58 + Expo Router + NativeWind v5
@@ -113,7 +116,8 @@ vetplan-monorepo/
 │       ├── src/
 │       │   ├── modules/
 │       │   │   ├── auth/           # Controller, AuthService, strategies (jwt, google, linkedin, facebook),
-│       │   │   │                   # guards (global JWT + Roles, OAuthGuard), decorators, filters
+│       │   │   │                   # guards (global JWT + Roles, OAuthGuard, DevLoginGuard), decorators, filters,
+│       │   │   │                   # dev-login.controller.ts (local-only sign-in, off in production)
 │       │   │   ├── users/          # User & OAuthAccount entities, UsersService (sign-in resolution)
 │       │   │   ├── tenants/        # Tenant entity (clinic)
 │       │   │   ├── patients/       # Patient entity, service, controller (/patients)
@@ -147,6 +151,7 @@ vetplan-monorepo/
 │
 ├── docs/                           # ROADMAP.md, ARCHITECTURE.md, SURGICAL_MATH.md, DEPLOYMENT.md, ZERO COST playbook
 ├── .dockerignore                   # Backend image build context (no .env, no other apps' sources)
+├── compose.yaml                    # Local stack: Postgres → migrations → API → web, dev login, no .env
 ├── .env.example                    # Required environment keys (no values)
 ├── .gitignore                      # Strict Git exclusions
 ├── CLAUDE.md                       # AI Agent Guidelines & Architecture Specs

@@ -1,0 +1,88 @@
+# Local full stack with no .env file: Postgres → migrations → API → web.
+#   docker compose up --build        then open http://localhost:3000 → "Development sign-in"
+#   docker compose down              (add -v to also delete the database volume)
+#
+# Every value here is a throwaway local default, not a secret; production configuration lives only in
+# GCP Secret Manager (docs/DEPLOYMENT.md). Ports bind to 127.0.0.1, so the dev login, which signs anyone
+# in with any role, is unreachable from your network. The backend refuses it whenever NODE_ENV=production.
+# No ${...} interpolation on purpose: a root .env (if any) can't change this stack.
+name: vet-plan
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: apps/backend/Dockerfile
+  image: vet-plan-backend:local
+  init: true
+  environment: &backend-env
+    NODE_ENV: development
+    DATABASE_URL: postgres://vetplan:vetplan@db:5432/vetplan
+    JWT_SECRET: local-docker-only-not-a-secret-never-use-in-production
+
+services:
+  db:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: vetplan
+      POSTGRES_PASSWORD: vetplan
+      POSTGRES_DB: vetplan
+    volumes:
+      - db-data:/var/lib/postgresql
+    ports:
+      - 127.0.0.1:5433:5432
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U vetplan -d vetplan]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *backend
+    command: [node, node_modules/typeorm/cli.js, migration:run, -d, dist/config/data-source.js]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    <<: *backend
+    environment:
+      <<: *backend-env
+      PORT: "4000"
+      # Browser-facing URLs: sign-in redirects, CORS origin and OAuth callbacks
+      APP_URL: http://localhost:3000
+      API_URL: http://localhost:4000
+      DEV_LOGIN_ENABLED: "true"
+    ports:
+      - 127.0.0.1:4000:4000
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:4000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        PUBLIC_API_URL: http://localhost:4000
+    image: vet-plan-frontend:local
+    init: true
+    environment:
+      # Server-to-server inside the compose network; the browser uses PUBLIC_API_URL
+      API_URL: http://backend:4000
+      PUBLIC_API_URL: http://localhost:4000
+      DEV_LOGIN_ENABLED: "true"
+    ports:
+      - 127.0.0.1:3000:3000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db-data:

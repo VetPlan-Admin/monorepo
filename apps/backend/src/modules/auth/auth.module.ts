@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { DevLoginController } from './dev-login.controller.js';
 import { FacebookStrategy } from './strategies/facebook.strategy.js';
 import { GoogleStrategy } from './strategies/google.strategy.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
@@ -21,7 +22,7 @@ import { LinkedInStrategy } from './strategies/linkedin.strategy.js';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, DevLoginController],
   providers: [AuthService, JwtStrategy, GoogleStrategy, LinkedInStrategy, FacebookStrategy],
   exports: [AuthService],
 })

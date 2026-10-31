@@ -9,6 +9,14 @@ import { User } from './user.entity.js';
 
 const TENANT_NAME_MAX_LENGTH = 120;
 
+/** Dev login (local development only): every clinic role shares this clinic, so they see the same data. */
+export const DEV_TENANT_NAME = 'Dev Clinic (local)';
+
+/** `.invalid` is reserved (RFC 2606), so a dev user can never collide with a real person's email. */
+export function devUserEmail(role: Role): string {
+    return `dev-${role.toLowerCase().replaceAll('_', '-')}@vetplan.invalid`;
+}
+
 @Injectable()
 export class UsersService {
     constructor(
@@ -18,6 +26,37 @@ export class UsersService {
 
     findById(id: string): Promise<User | null> {
         return this.users.findOne({ where: { id }, relations: { tenant: true } });
+    }
+
+    /**
+     * Fixed user per role for the local dev login (never reachable in production, see DevLoginGuard).
+     * Clinic roles join the shared dev clinic; SUPER_ADMIN has no clinic, like real platform staff.
+     */
+    async findOrCreateDevUser(role: Role): Promise<User> {
+        const email = devUserEmail(role);
+        const userId = await this.dataSource.transaction(async (manager) => {
+            const users = manager.getRepository(User);
+            let user = await users.findOne({ where: { email } });
+            if (!user) {
+                let tenantId: string | null = null;
+                if (role !== Role.SUPER_ADMIN) {
+                    const tenants = manager.getRepository(Tenant);
+                    const tenant =
+                        (await tenants.findOne({ where: { name: DEV_TENANT_NAME } })) ??
+                        (await tenants.save({ name: DEV_TENANT_NAME }));
+                    tenantId = tenant.id;
+                }
+                user = users.create({ email, displayName: `Dev ${role}`, avatarUrl: null, role, tenantId });
+            }
+            user.lastLoginAt = new Date();
+            return (await users.save(user)).id;
+        });
+
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new UnauthorizedException('User disappeared during sign-in');
+        }
+        return user;
     }
 
     /**

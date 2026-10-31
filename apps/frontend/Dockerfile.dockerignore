@@ -1,0 +1,20 @@
+# Docker build context for apps/frontend/Dockerfile (built from the repo root by compose.yaml).
+# BuildKit uses this file instead of the root .dockerignore, which is for the backend image.
+.env
+.env.*
+**/.env
+**/.env.*
+.git
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.expo
+**/.pglite
+**/*.tsbuildinfo
+docs
+# Other apps: only their package.json is needed (pnpm reads the whole workspace)
+apps/backend/*
+!apps/backend/package.json
+apps/mobile/*
+!apps/mobile/package.json

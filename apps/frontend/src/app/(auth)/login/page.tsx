@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { LogIn } from "lucide-react";
 import { OAuthProvider } from "@vet-plan/shared";
-import { API_URL } from "@/lib/api";
+import { PUBLIC_API_URL } from "@/lib/api";
+import { DevLogin } from "./dev-login";
 
 export const metadata: Metadata = {
   title: "Sign in · Vet Plan",
@@ -39,7 +40,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
         {PROVIDERS.map((provider) => (
           <a
             key={provider.id}
-            href={`${API_URL}/auth/oauth/${provider.id}`}
+            href={`${PUBLIC_API_URL}/auth/oauth/${provider.id}`}
             className="flex h-12 items-center justify-center gap-2 rounded-full bg-brand-yellow px-5 font-semibold text-brand-purple transition-opacity hover:opacity-90"
           >
             <LogIn aria-hidden className="size-4" />
@@ -47,6 +48,10 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
           </a>
         ))}
       </div>
+
+      <Suspense fallback={null}>
+        <DevLogin />
+      </Suspense>
     </div>
   );
 }

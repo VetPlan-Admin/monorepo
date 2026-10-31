@@ -27,17 +27,35 @@ Project `vet-plan` in AWS us-east-1, Postgres 18, branch `production`, database 
 
 ## Step 2: GCP backend
 
-### Part A: Account, billing, budget, project (console)
-1. Go to https://console.cloud.google.com with the Google account that will own the project and accept the terms.
-2. **Billing:** start the Free Trial ($300 credit, 90 days). It needs a card for identity, and Google does
-   not charge it during the trial. Cloud Run, Cloud Build and Artifact Registry need a billing account even
-   when usage stays inside the free tier.
-3. **Budget alert:** ☰ → *Billing* → *Budgets & alerts* → *Create budget*:
-   name `vet-plan-zero`, all projects/services, **amount $1**, thresholds 50 %, 90 %, 100 % (actual) and
-   100 % (forecasted), email billing admins. *Budgets only alert; they don't stop spending.* The real
-   protection is the guardrails below.
-4. **Project:** project picker → *New project* → name `vet-plan` (note the **Project ID**, e.g.
-   `vet-plan-123456`) → *Create* → select it.
+### Part A: Account, billing, budget, project (console), strict $0
+**Why this costs $0.** The Free Trial can't charge you: Google says *"You will not be billed for any
+Google Cloud usage during your Free Trial"* and *"No automatic charges"*. If the $300 credit runs out or
+90 days pass, the trial billing account closes and its resources stop, and nothing is billed. Charges
+become possible only if you click **Activate** (upgrade). The Free Tier applies during the trial and
+doesn't use the credit, so this setup should spend none of it. Cloud Run, Cloud Build and Artifact
+Registry need a billing account even when usage stays free; the trial billing account is that account.
+
+1. **Sign up for the Free Trial.** Use the one Google account that will own everything (free-tier limits
+   are counted per billing account). Go to https://console.cloud.google.com → accept the terms → **Start free**.
+   - You're eligible only if you never paid for Google Cloud, Google Maps Platform or Firebase and never had a trial.
+   - Choose account type **Individual** if asked. Enter the card (or other method offered); Google uses it only
+     for identity and fraud checks. A pending **$0–$1 authorization hold** may appear. It isn't a charge and
+     is released within a few days (at most about a month).
+   - This creates the trial billing account *My Billing Account* and an empty project *My First Project*
+     (costs nothing; optionally shut it down in *IAM & Admin → Settings*).
+2. **Budget alert (early warning):** ☰ → *Billing* → *Budgets & alerts* → *Create budget*:
+   - Name `vet-plan-zero`, time range **Monthly**, projects **All**, services **All**.
+   - Savings: **untick "Promotional credits"** (the $300 trial credit would otherwise hide real spending) and
+     **keep "Free tier credits" ticked** (free usage must count as $0). All savings are ticked by default.
+   - Amount: **Specified amount**, 1 USD (or the equivalent in your billing currency).
+   - Thresholds: 50 %, 90 %, 100 % **Actual** and 100 % **Forecasted**. Keep *Email billing admins and users* on.
+   - Any alert email means something is costing money beyond the free tier: open *Billing → Reports*,
+     group by service, and fix it. Budgets only alert; they don't stop spending.
+3. **Project:** project picker → *New project* → name `vet-plan` (note the **Project ID**, e.g.
+   `vet-plan-123456`) → *Create* → select it. *Billing → Account management* should list it under the
+   trial billing account.
+4. **Don't click "Activate" or "Upgrade"** (Welcome page or top banner) during the trial. It's the only step
+   that allows charges. See [GCP free trial end](#gcp-free-trial-end-decide-by-day-80) before you ever do.
 
 ### Part B: One-time setup script (Cloud Shell)
 5. Click the **Cloud Shell** icon (`>_`, top right). If asked, *Authorize*.
@@ -86,6 +104,21 @@ Project `vet-plan` in AWS us-east-1, Postgres 18, branch `production`, database 
 
 ---
 
+## GCP free trial end (decide by day 80)
+The trial ends 90 days after signup. Put a calendar reminder for day 80.
+- **Let it close (stays $0):** the billing account closes and every resource stops. After a 30-day grace
+  period, when you can still upgrade, Google deletes the resources. Nothing is lost that can't be rebuilt:
+  code is in GitHub, data in Neon, secret values in the password manager.
+- **Keep it running:** first add a **billing kill switch** (ROADMAP Phase 7), then click *Activate*.
+  - How it works: the `vet-plan-zero` budget publishes to a Pub/Sub topic, and a small function unlinks
+    billing from the project when cost passes the budget. It needs *Project Billing Manager* (+ Browser)
+    on the project.
+  - Limits: Google sends budget notifications several times a day and the first one can take hours, so it
+    caps a runaway at a few hours of usage rather than exactly $0. Requests beyond 2 million/month cost
+    $0.40 per million, which is what a bot flood would run up.
+  - Side effect: unlinking stops every service, free ones too, and *"resources might be irretrievably
+    deleted"*. Recovery: re-link billing, re-run `gcp-setup.sh`, re-create the secret, run the trigger.
+
 ## Changing configuration
 1. *Secret Manager* → `vet-plan-backend-env` → **New version** → paste the full file with the change → *Add*.
 2. **Destroy** the previous version (⋮ → *Destroy*): disabled versions still count toward the 6 free ones.
@@ -104,9 +137,9 @@ aren't rolled back automatically; write a new migration instead of editing an ap
 - Artifact Registry keeps 2 images (cleanup policy). One image ≈ 120–150 MB compressed.
 - Secret Manager: one secret + the GitHub connection's token = 2 of 6 free versions; destroy old versions.
 - Never add: Cloud SQL, load balancers, Cloud NAT, VPC connectors, Cloud Armor, Memorystore (all paid).
+- Never put `DEV_LOGIN_ENABLED` in `vet-plan-backend-env`. The API ignores it under `NODE_ENV=production`, but it belongs only to `compose.yaml` (local).
 - Outbound data from North America: 1 GiB/month free. API responses are small; images never leave the browser.
-- **Free trial end (90 days):** to keep services running, *Billing* → *Activate full account*. Free tier
-  still applies; the $1 budget alert then becomes the early warning.
+- **Free trial:** never click *Activate* until the kill switch exists ([GCP free trial end](#gcp-free-trial-end-decide-by-day-80)).
 
 ## Next steps
 - Step 3: Cloudflare (frontend hosting + Workers AI token), then set `APP_URL` and `API_URL`.
