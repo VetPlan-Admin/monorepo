@@ -3,7 +3,7 @@
 The accounts, values and parameters needed to run a web/mobile SaaS on **free tiers only**, as set up
 for Vet Plan. Reuse it for another app by replacing the placeholders in §2.
 
-> Free-tier facts verified on **2026-10-31** against each provider's pricing/docs (links in §9).
+> Free-tier facts verified on **2026-11-01** against each provider's pricing/docs (links in §9).
 > Free tiers change often (in 2026 alone GitHub Models was retired and Cerebras became a trial):
 > re-check §9 before reusing.
 > Vet Plan specifics: `docs/DEPLOYMENT.md` (step-by-step) and `docs/ARCHITECTURE.md` §3, §9–§11.
@@ -32,7 +32,7 @@ for Vet Plan. Reuse it for another app by replacing the placeholders in §2.
 | 1 | Password manager (e.g. Bitwarden) | Holding every secret below | Free | No | Email | — |
 | 2 | **GitHub** | Code, Cloud Build source, support issues, CI | Free | No | — | Private repos: $12/month Actions credit (~2,000 Linux min); usage **blocked** at the limit without a card; public repos free |
 | 3 | **Neon** | Postgres | Free (permanent) | No | GitHub | 1 GB/project, 100 CU-h/project/month, ≤2 CU, sleeps after 5 min (wakes in ~ms), 6 h restore window, 100 projects |
-| 4 | **Google Cloud (GCP)** | API (Cloud Run), builds, images, secrets, OAuth client | Free trial → free tier | **Yes** (identity only; $0–1 hold, released) | Google account | See §4.4 |
+| 4 | **Google Cloud (GCP)** | API (Cloud Run), builds, images, secrets, OAuth client | Free trial → free tier | **Yes** (identity only; $0–1 hold, released; some countries add a refundable one-time prepayment, Brazil R$ 150) | Google account | See §4.4 |
 | 5 | **Cloudflare** | Frontend hosting, Workers AI (LLM) | Free | No | Email | Workers: 100k req/day, **10 ms CPU/request**, 64 MiB bundle; Workers AI: 10,000 neurons/day (errors when exhausted) |
 | 6 | Upstash | Redis over REST (rate limits, de-dup) | Free | No | GitHub/Google | 1 DB, 500K commands/month, 250 MB, 10 GB bandwidth |
 | 7 | Groq | LLM fallback | Free | No | Google/GitHub | ~30 req/min, ~1,000 req/day per model (exact limits in the console) |
@@ -111,10 +111,12 @@ One entry per secret, named `<APP> · <KEY>` (e.g. `vet-plan · DATABASE_URL`). 
 **A. Account and budget**
 | Item | Value |
 |---|---|
-| Sign up | https://console.cloud.google.com → **Start free**: $300 credit / 90 days. Card (or other method) for identity and fraud checks only; a pending $0–1 authorization hold is released. Eligible only if never paid for Google Cloud, Maps or Firebase and no previous trial. Account type **Individual** |
+| Sign up | https://console.cloud.google.com → **Start free**: $300 credit / 90 days. Card (or other method) for identity and fraud checks only; a pending $0–1 authorization hold is released. Eligible only if never paid for Google Cloud, Maps or Firebase and no previous trial. Prepaid and virtual cards are refused |
+| One-time prepayment | Some countries/payment methods (Brazil, cards: **R$ 150**, 2026-11): a real charge credited to the billing account balance, *"refunded if unused by the time of account closure"*. Not used by the trial or free tier. Keep the receipt; ask Cloud Billing support if the refund doesn't arrive. Different from AI Studio *Prepay* credits (non-refundable) |
+| Profile type | **Can't be changed after signup.** Company will own and pay → **Organization** (company name, tax id such as CNPJ, address). A personal card is fine for the trial (*"without being personally responsible for any payment"*); switch to a company payment method before *Activate*. Only Organization profiles can add users. **Individual** only for a personal owner. Moving later = new billing account + *Change billing* on the project (no downtime), but the trial credit doesn't move |
 | Why it's $0 | *"You will not be billed for any Google Cloud usage during your Free Trial"*, no automatic charges. Free Tier applies during the trial and doesn't use the credit. Credit exhausted or day 90 → account closes, resources stop, nothing billed |
 | Never | Click **Activate / Upgrade** before the kill switch exists (it's the only step that allows charges) |
-| Budget | *Billing → Budgets & alerts*: name `<APP>-zero`, **Monthly**, all projects/services, Savings: **untick Promotional credits** (trial credit hides spend), **keep Free tier credits**; specified amount 1 USD (or equivalent), thresholds 50/90/100 % actual + 100 % forecast, email billing admins and users |
+| Budget | *Billing → Budgets & alerts*: name `<APP>-zero`, **Monthly**, all projects/services, Savings: **untick Promotional credits** (trial credit hides spend), **keep Free tier credits**; specified amount 1 USD (or equivalent), thresholds 50/90/100 % actual + 100 % forecast, email billing admins and users. Amount is in the billing currency (Brazil: R$ 5) |
 | Trial end (decide by day 80) | *Let it close*: resources stop, 30-day grace to upgrade, then deleted ($0). *Keep running*: kill switch first (budget → Pub/Sub topic → function that unlinks billing; needs Project Billing Manager + Browser on the project), then *Activate*. Notifications arrive several times a day and can lag hours, so it caps a runaway, not to exactly $0; unlinking stops all services (free ones too) and may delete resources |
 
 **B. Project and APIs** (Cloud Shell: `apps/backend/deploy/gcp-setup.sh`)
@@ -303,9 +305,9 @@ Everything in `<SECRET>` is one file = **one** secret version, whatever the numb
 
 ---
 
-## 9. Sources (verified 2026-10-31)
+## 9. Sources (verified 2026-11-01)
 - Neon: [pricing](https://neon.com/pricing) · [regions](https://neon.com/docs/introduction/regions) · [connection pooling](https://neon.com/docs/connect/connection-pooling) · [roles](https://neon.com/docs/manage/roles)
-- GCP: [Cloud Run pricing & tiers](https://cloud.google.com/run/pricing) · [Cloud Build pricing](https://cloud.google.com/build/pricing) · [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing) · [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing) · [Free Program (trial + free tier)](https://docs.cloud.google.com/free/docs/free-cloud-features) · [Budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Budget Pub/Sub notifications](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications) · [Disable billing with notifications (kill switch)](https://docs.cloud.google.com/billing/docs/how-to/disable-billing-with-notifications) · [Unlink billing: roles](https://docs.cloud.google.com/billing/docs/how-to/modify-project)
+- GCP: [Cloud Run pricing & tiers](https://cloud.google.com/run/pricing) · [Cloud Build pricing](https://cloud.google.com/build/pricing) · [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing) · [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing) · [Free Program (trial + free tier)](https://docs.cloud.google.com/free/docs/free-cloud-features) · [Budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Budget Pub/Sub notifications](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications) · [Disable billing with notifications (kill switch)](https://docs.cloud.google.com/billing/docs/how-to/disable-billing-with-notifications) · [Unlink / change a project's billing: roles](https://docs.cloud.google.com/billing/docs/how-to/modify-project) · [Free trial FAQ (personal card for a company)](https://cloud.google.com/signup-faqs) · [Payments profile types](https://support.google.com/paymentscenter/answer/9028746) · [Brazil VAT (local contracting)](https://docs.cloud.google.com/billing/docs/resources/vat-overview) · [Payment methods + one-time prepayment](https://docs.cloud.google.com/billing/docs/how-to/payment-methods) · [Prepay vs postpay (refund rules)](https://docs.cloud.google.com/billing/docs/in-product-billing-setup)
 - Cloudflare: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) · [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) · [Workers AI data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/) · [OpenAI-compatible API](https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/)
 - GitHub: [Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 - Upstash: [Redis pricing](https://upstash.com/pricing/redis) · Groq: [rate limits](https://console.groq.com/docs/rate-limits), [your data](https://console.groq.com/docs/your-data)

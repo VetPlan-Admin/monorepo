@@ -38,16 +38,32 @@ Registry need a billing account even when usage stays free; the trial billing ac
 1. **Sign up for the Free Trial.** Use the one Google account that will own everything (free-tier limits
    are counted per billing account). Go to https://console.cloud.google.com → accept the terms → **Start free**.
    - You're eligible only if you never paid for Google Cloud, Google Maps Platform or Firebase and never had a trial.
-   - Choose account type **Individual** if asked. Enter the card (or other method offered); Google uses it only
-     for identity and fraud checks. A pending **$0–$1 authorization hold** may appear. It isn't a charge and
-     is released within a few days (at most about a month).
+   - **Profile type** (*Tipo de perfil*, *Confirme sua identidade*): it **can't be changed after signup**.
+     - If a company will own and pay for the product, choose **Organization** (*Organização*: company name,
+       CNPJ/tax id, address). A personal card is fine. Google's FAQ: *"A corporate credit card is not required
+       to start the Google Cloud Free Trial. You can use your personal credit card to verify your identity,
+       without being personally responsible for any payment"*. Switch to a company payment method before ever
+       clicking *Activate*. Organization profiles can also add more users; Individual profiles can't.
+     - Choose **Individual** (*Pessoa física*) only if you will own and pay for it personally. Moving to a
+       company later means a **new** billing account under an Organization profile, with the project re-linked
+       (*Billing → My projects → Change billing*, no downtime). The $300 trial stays with the old account, so
+       the new one is paid from day one and needs the kill switch first.
+   - Enter the card (prepaid and virtual cards are refused); Google uses it only for identity and fraud checks.
+     A pending **$0–$1 authorization hold** may appear. It isn't a charge and is released within a few days
+     (at most about a month).
+   - **Brazil (and some other countries): one-time prepayment** (*Pré-pagamento único*, **R$ 150** in
+     2026-11). It's a real charge on the card, credited as a balance on the billing account, so it's a deposit,
+     not a fee. Google: *"Prepayments to a Postpay Google payments account will be refunded if unused by the time
+     of account closure."* The trial and the free tier don't consume it, and it's refunded when the account
+     closes (e.g. the trial ends unupgraded). Keep the receipt; if no refund arrives, contact Cloud Billing
+     support (free). It isn't the AI Studio *Prepay* credit, which is non-refundable.
    - This creates the trial billing account *My Billing Account* and an empty project *My First Project*
      (costs nothing; optionally shut it down in *IAM & Admin → Settings*).
 2. **Budget alert (early warning):** ☰ → *Billing* → *Budgets & alerts* → *Create budget*:
    - Name `vet-plan-zero`, time range **Monthly**, projects **All**, services **All**.
    - Savings: **untick "Promotional credits"** (the $300 trial credit would otherwise hide real spending) and
      **keep "Free tier credits" ticked** (free usage must count as $0). All savings are ticked by default.
-   - Amount: **Specified amount**, 1 USD (or the equivalent in your billing currency).
+   - Amount: **Specified amount**, 1 USD or the equivalent in your billing currency (Brazil: **R$ 5**).
    - Thresholds: 50 %, 90 %, 100 % **Actual** and 100 % **Forecasted**. Keep *Email billing admins and users* on.
    - Any alert email means something is costing money beyond the free tier: open *Billing → Reports*,
      group by service, and fix it. Budgets only alert; they don't stop spending.
@@ -100,7 +116,8 @@ Registry need a billing account even when usage stays free; the trial billing ac
     (~4–6 minutes). The `migrate` step runs both migrations against Neon.
 15. ☰ → *Cloud Run* → `vet-plan-api` → copy the **URL** (`https://vet-plan-api-….us-east4.run.app`).
     Open `<URL>/health` → `{"status":"ok"}`. `<URL>/cases` → 401 (login required). `<URL>/metrics` → 404
-    (no `METRICS_TOKEN` yet). From now on, every push to `main` touching the backend redeploys automatically.
+    (no `METRICS_TOKEN` yet). `<URL>/auth/dev/roles` → 404 (dev login is always off in production).
+    From now on, every push to `main` touching the backend redeploys automatically.
 
 ---
 
