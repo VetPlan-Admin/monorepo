@@ -59,7 +59,8 @@ Registry need a billing account even when usage stays free; the trial billing ac
      support (free). It isn't the AI Studio *Prepay* credit, which is non-refundable.
    - This creates the trial billing account *My Billing Account* and an empty project *My First Project*
      (costs nothing; optionally shut it down in *IAM & Admin → Settings*).
-2. **Budget alert (early warning):** ☰ → *Billing* → *Budgets & alerts* → *Create budget*:
+2. **Budget alert (early warning):** ☰ → *Billing* → *Budgets & caps* (older consoles: *Budgets & alerts*) →
+   *Create budget* → **Alerts only**:
    - Name `vet-plan-zero`, time range **Monthly**, projects **All**, services **All**.
    - Savings: **untick "Promotional credits"** (the $300 trial credit would otherwise hide real spending) and
      **keep "Free tier credits" ticked** (free usage must count as $0). All savings are ticked by default.
@@ -67,9 +68,19 @@ Registry need a billing account even when usage stays free; the trial billing ac
    - Thresholds: 50 %, 90 %, 100 % **Actual** and 100 % **Forecasted**. Keep *Email billing admins and users* on.
    - Any alert email means something is costing money beyond the free tier: open *Billing → Reports*,
      group by service, and fix it. Budgets only alert; they don't stop spending.
-3. **Project:** project picker → *New project* → name `vet-plan` (note the **Project ID**, e.g.
-   `vet-plan-123456`) → *Create* → select it. *Billing → Account management* should list it under the
-   trial billing account.
+3. **Project** (Cloud Shell, `>_` icon; it shows errors the console may hide). It creates `vet-plan-<6 digits>`
+   inside your organization if signup created one (company accounts: notification *"Criar organização e
+   projeto"*), links the trial billing account and selects the project:
+   ```
+   ORG=$(gcloud organizations list --format="value(name.basename())" --limit=1); echo "organization: ${ORG:-none}"
+   PROJECT_ID=vet-plan-$(shuf -i 100000-999999 -n 1)
+   gcloud projects create "$PROJECT_ID" --name=vet-plan ${ORG:+--organization=$ORG}
+   gcloud billing projects link "$PROJECT_ID" --billing-account="$(gcloud billing accounts list --filter=open=true --format='value(name.basename())' --limit=1)"
+   gcloud config set project "$PROJECT_ID" && echo "PROJECT_ID=$PROJECT_ID"
+   ```
+   Note the printed **Project ID**. New organizations get *secure-by-default* policies (no service-account
+   keys, domain-restricted sharing). The pipeline is built for them: no keys, and the API is made public with
+   `--no-invoker-iam-check` instead of granting `allUsers`.
 4. **Don't click "Activate" or "Upgrade"** (Welcome page or top banner) during the trial. It's the only step
    that allows charges. See [GCP free trial end](#gcp-free-trial-end-decide-by-day-80) before you ever do.
 
@@ -83,28 +94,43 @@ Registry need a billing account even when usage stays free; the trial billing ac
    accounts: `vet-plan-backend` (runtime) and `vet-plan-deployer` (Cloud Build). The first API enable can
    take a minute. The last line says the secret doesn't exist yet: expected.
 
+8. **Cloud Run spend cap (hard stop for the API):** ☰ → *Billing* → *Budgets & caps* → *Create budget* →
+   **Spend cap enforcement** (not *Alerts only*). Name `vet-plan-run-cap`, project `vet-plan`, service
+   **Cloud Run**. The time range is fixed to Monthly and Savings can't be edited. Target amount **R$ 25**
+   (about US$ 5).
+   - Why that amount: the cap counts Cloud Run usage at **list price, before free-tier credits**. The monthly
+     Cloud Run free tier is worth about US$ 6 at list price (180k vCPU-s + 360k GiB-s + 2M requests), so a cap
+     just below it pauses the API before usage could leave the free tier. Normal Vet Plan traffic is a tiny
+     fraction of that.
+   - When it triggers, new Cloud Run requests (and the migration job) are paused until the 1st of next month,
+     or until you lift it (*Edit budget → Lift spend cap*). In-flight requests finish. Enforcement isn't
+     instant, which is why the amount leaves a margin. Alerts at 50/80/100 % go to billing admins and project
+     owners automatically.
+   - It needs the Cloud Run API, which the script just enabled. Spend caps cover only Cloud Run (and Cloud Run
+     functions, Gemini API, Vertex AI); the alert budget from step 2 stays for everything else.
+
 ### Part C: The configuration secret (console + Cloud Shell)
-8. Generate the JWT key in Cloud Shell: `openssl rand -base64 48 | tr -d '\n'; echo` (copy the output).
-9. ☰ → *Security* → *Secret Manager* → *Create secret*:
+9. Generate the JWT key in Cloud Shell: `openssl rand -base64 48 | tr -d '\n'; echo` (copy the output).
+10. ☰ → *Security* → *Secret Manager* → *Create secret*:
    - Name: `vet-plan-backend-env`
    - Secret value (paste, one `KEY=value` per line, no quotes, no spaces around `=`):
      ```
      DATABASE_URL=<Neon pooled string>
      DATABASE_MIGRATION_URL=<Neon direct string>
-     JWT_SECRET=<output of step 8>
+     JWT_SECRET=<output of step 9>
      APP_URL=http://localhost:3000
      ```
      (`APP_URL` is a placeholder until the frontend is deployed in Step 3.)
    - Replication: **Automatic** (billed as one location). Leave rotation/expiration off. *Create secret*.
-10. Back in Cloud Shell, run `bash gcp-setup.sh` again. The last line now says `granted on vet-plan-backend-env`.
+11. Back in Cloud Shell, run `bash gcp-setup.sh` again. The last line now says `granted on vet-plan-backend-env`.
 
 ### Part D: Connect GitHub and create the trigger (console)
-11. ☰ → *Cloud Build* → *Repositories* → **2nd gen** tab → *Create host connection*:
+12. ☰ → *Cloud Build* → *Repositories* → **2nd gen** tab → *Create host connection*:
     provider **GitHub**, region **us-east4**, name `github` → *Connect*. If prompted, grant the Cloud Build
     service agent the Secret Manager role (it stores the GitHub token as one secret version).
     Authorize the *Google Cloud Build* GitHub app and install it **only on `VetPlan-Admin/monorepo`**.
-12. *Link repository* → connection `github` → select `VetPlan-Admin/monorepo` → *Link*.
-13. *Cloud Build* → *Triggers* → region **us-east4** → *Create trigger*:
+13. *Link repository* → connection `github` → select `VetPlan-Admin/monorepo` → *Link*.
+14. *Cloud Build* → *Triggers* → region **us-east4** → *Create trigger*:
     - Name `backend-main`; Event **Push to a branch**; Source **2nd gen**, repository `monorepo`, branch `^main$`
     - *Included files filter* (build only when the backend can change): `apps/backend/**`,
       `packages/shared/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.dockerignore`
@@ -112,9 +138,9 @@ Registry need a billing account even when usage stays free; the trial billing ac
     - Service account: **`vet-plan-deployer@<PROJECT_ID>.iam.gserviceaccount.com`** → *Create*.
 
 ### Part E: First deploy and check
-14. On the trigger row, click **Run** (branch `main`). Watch *History*: build → push → migrate → deploy
+15. On the trigger row, click **Run** (branch `main`). Watch *History*: build → push → migrate → deploy
     (~4–6 minutes). The `migrate` step runs both migrations against Neon.
-15. ☰ → *Cloud Run* → `vet-plan-api` → copy the **URL** (`https://vet-plan-api-….us-east4.run.app`).
+16. ☰ → *Cloud Run* → `vet-plan-api` → copy the **URL** (`https://vet-plan-api-….us-east4.run.app`).
     Open `<URL>/health` → `{"status":"ok"}`. `<URL>/cases` → 401 (login required). `<URL>/metrics` → 404
     (no `METRICS_TOKEN` yet). `<URL>/auth/dev/roles` → 404 (dev login is always off in production).
     From now on, every push to `main` touching the backend redeploys automatically.
@@ -126,15 +152,15 @@ The trial ends 90 days after signup. Put a calendar reminder for day 80.
 - **Let it close (stays $0):** the billing account closes and every resource stops. After a 30-day grace
   period, when you can still upgrade, Google deletes the resources. Nothing is lost that can't be rebuilt:
   code is in GitHub, data in Neon, secret values in the password manager.
-- **Keep it running:** first add a **billing kill switch** (ROADMAP Phase 7), then click *Activate*.
-  - How it works: the `vet-plan-zero` budget publishes to a Pub/Sub topic, and a small function unlinks
-    billing from the project when cost passes the budget. It needs *Project Billing Manager* (+ Browser)
-    on the project.
-  - Limits: Google sends budget notifications several times a day and the first one can take hours, so it
-    caps a runaway at a few hours of usage rather than exactly $0. Requests beyond 2 million/month cost
-    $0.40 per million, which is what a bot flood would run up.
-  - Side effect: unlinking stops every service, free ones too, and *"resources might be irretrievably
-    deleted"*. Recovery: re-link billing, re-run `gcp-setup.sh`, re-create the secret, run the trigger.
+- **Keep it running:** check that the Cloud Run spend cap `vet-plan-run-cap` (step 8) and the alert budget
+  `vet-plan-zero` exist, switch the payment method to a company card, then click *Activate*.
+  - The spend cap pauses the API before it can leave the free tier (a request flood is the main risk:
+    $0.40 per million requests beyond 2 million).
+  - The other services (Cloud Build, Artifact Registry, Secret Manager, Logging) can't be capped. They only
+    grow through your own actions (pushes, images, secret versions), which the guardrails below bound.
+  - Optional extra: a **billing kill switch** (budget → Pub/Sub → function that unlinks billing; needs
+    *Project Billing Manager* + Browser). Notifications lag hours, and unlinking stops every service and
+    *"resources might be irretrievably deleted"*, so it's a last resort, not the first line.
 
 ## Changing configuration
 1. *Secret Manager* → `vet-plan-backend-env` → **New version** → paste the full file with the change → *Add*.
@@ -153,6 +179,8 @@ aren't rolled back automatically; write a new migration instead of editing an ap
 - Builds only on backend changes (included-files filter); ~3–5 build-minutes each.
 - Artifact Registry keeps 2 images (cleanup policy). One image ≈ 120–150 MB compressed.
 - Secret Manager: one secret + the GitHub connection's token = 2 of 6 free versions; destroy old versions.
+- Cloud Run spend cap `vet-plan-run-cap` (R$ 25, list price before free-tier credits): don't delete or raise
+  it without reviewing this section. If it ever triggers, find the cause in *Billing → Reports* before lifting it.
 - Never add: Cloud SQL, load balancers, Cloud NAT, VPC connectors, Cloud Armor, Memorystore (all paid).
 - Never put `DEV_LOGIN_ENABLED` in `vet-plan-backend-env`. The API ignores it under `NODE_ENV=production`, but it belongs only to `compose.yaml` (local).
 - Outbound data from North America: 1 GiB/month free. API responses are small; images never leave the browser.

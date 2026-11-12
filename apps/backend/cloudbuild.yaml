@@ -66,7 +66,9 @@ steps:
       - --service-account=${_RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com
       - --set-secrets=/secrets/backend.env=${_SECRET}:latest
       - --set-env-vars=NODE_ENV=production,ENV_FILE=/secrets/backend.env
-      - --allow-unauthenticated
+      # Public API (routes are protected by JWT). Disabling the invoker IAM check works under an organization's
+      # domain-restricted sharing policy, where granting run.invoker to allUsers (--allow-unauthenticated) fails.
+      - --no-invoker-iam-check
       - --port=8080
       - --cpu=1
       - --memory=512Mi

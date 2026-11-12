@@ -90,7 +90,7 @@ Reference: `docs/DEPLOYMENT.md` (step-by-step, $0 guardrails) and `docs/ZERO COS
 - [x] Step 1: Neon project `vet-plan` in AWS us-east-1 (pooled URL for the app, direct URL for migrations).
 - [x] Deployment as code: `apps/backend/Dockerfile` (pnpm deploy bundle, non-root), `.dockerignore`, `apps/backend/cloudbuild.yaml` (build → push → migrate job → deploy), `apps/backend/deploy/gcp-setup.sh` (Cloud Shell), config from one mounted secret (`ENV_FILE`).
 - [x] Local stack without `.env`: `compose.yaml` (Postgres 18 → migrations → API → web, `apps/frontend/Dockerfile`) and a dev-only login (`/auth/dev/*`, needs `DEV_LOGIN_ENABLED=true` + development/test `NODE_ENV`, 404 otherwise; e2e-tested).
-- [ ] Step 2: GCP account, $1 budget alert, project, setup script, secret, GitHub trigger, first deploy (us-east4).
+- [ ] Step 2: GCP account (Organization profile; Brazil: refundable R$ 150 prepayment), alert budget, project, setup script, Cloud Run spend cap, secret, GitHub trigger, first deploy (us-east4).
 - [ ] Step 3: Cloudflare: deploy the frontend and create the Workers AI token; set `APP_URL` / `API_URL`. **Validate first:** Workers Free allows 10 ms CPU per request, which Next.js server rendering (OpenNext) may exceed. Free fallback: run the frontend on Cloud Run as a second service.
 - [ ] Step 4: Google OAuth client with production callback URLs (then LinkedIn/Facebook if wanted).
 - [ ] Step 5: Bot and observability keys (Telegram, Groq, GitHub issues token, Upstash, `METRICS_TOKEN`, Axiom, Grafana scrape).
@@ -98,4 +98,4 @@ Reference: `docs/DEPLOYMENT.md` (step-by-step, $0 guardrails) and `docs/ZERO COS
 - [ ] Clinic invitations; refresh tokens + single-use exchange codes; API rate limiting (Upstash).
 - [ ] Playwright end-to-end tests in the repo (planner and case flows), run in CI.
 - [ ] Portuguese translations (`next-intl`); LGPD documents (privacy policy, terms, data-processing agreement).
-- [ ] GCP free trial ends 90 days after signup. By day 80, either let it close ($0; resources stop) or add the billing kill switch (budget → Pub/Sub → function that unlinks billing, reusing the backend image so it adds no stored image) and only then *Activate* (`docs/DEPLOYMENT.md`, "GCP free trial end").
+- [ ] GCP free trial (started 2026-11-01) **expires 2027-01-31**. By **2027-01-21**, either let it close ($0; resources stop) or confirm the Cloud Run spend cap (`vet-plan-run-cap`) and alert budget, switch to a company card, and *Activate*. Optional: billing kill switch for the services caps don't cover (budget → Pub/Sub → function that unlinks billing, reusing the backend image) (`docs/DEPLOYMENT.md`, "GCP free trial end").

@@ -17,6 +17,18 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 echo "Project: $PROJECT_ID · Region: $REGION"
 
+# A new service account takes a few seconds to become visible to IAM ("does not exist" right after
+# creation), so retry IAM bindings for up to a minute before giving up.
+retry() {
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    "$@" 2>/dev/null && return 0
+    echo "    IAM not ready yet, retrying in 10 s ($attempt/6)…"
+    sleep 10
+  done
+  "$@"
+}
+
 echo "1/5 Enabling APIs (Cloud Run, Cloud Build, Artifact Registry, Secret Manager, IAM)…"
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   secretmanager.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
@@ -42,15 +54,15 @@ done
 
 echo "4/5 Deployer permissions (deploy Cloud Run, push images, write build logs, act as runtime)…"
 for role in roles/run.admin roles/artifactregistry.writer roles/logging.logWriter; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${DEPLOYER_SA}" \
+  retry gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${DEPLOYER_SA}" \
     --role="$role" --condition=None --quiet >/dev/null
 done
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
+retry gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
   --member="serviceAccount:${DEPLOYER_SA}" --role=roles/iam.serviceAccountUser --quiet >/dev/null
 
 echo "5/5 Secret access for the runtime account…"
 if gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
-  gcloud secrets add-iam-policy-binding "$SECRET" --member="serviceAccount:${RUNTIME_SA}" \
+  retry gcloud secrets add-iam-policy-binding "$SECRET" --member="serviceAccount:${RUNTIME_SA}" \
     --role=roles/secretmanager.secretAccessor --quiet >/dev/null
   echo "    granted on $SECRET"
 else

@@ -13,7 +13,8 @@ for Vet Plan. Reuse it for another app by replacing the placeholders in §2.
 ## 0. Rules that keep it at $0
 1. **Budgets don't stop spending; they only alert.** The real protection is configuration: scale to zero,
    capped instances, request-based billing, image cleanup, one bundled secret (§4.4). On GCP, the Free
-   Trial makes charges impossible for 90 days; after upgrading, only a billing kill switch is a hard stop.
+   Trial makes charges impossible for 90 days. After upgrading, a **Cloud Run spend cap** (GA 2026-10-13) pauses
+   the API before it leaves the free tier; services that can't be capped are bounded by configuration.
 2. Prefer providers that **block or error** at the free limit over ones that bill overage (Workers AI,
    Neon, Upstash, GitHub Actions without a card all stop or error).
 3. **Secrets never go into chat, the repo, Dockerfiles or build files.** They go straight from the
@@ -116,13 +117,14 @@ One entry per secret, named `<APP> · <KEY>` (e.g. `vet-plan · DATABASE_URL`). 
 | Profile type | **Can't be changed after signup.** Company will own and pay → **Organization** (company name, tax id such as CNPJ, address). A personal card is fine for the trial (*"without being personally responsible for any payment"*); switch to a company payment method before *Activate*. Only Organization profiles can add users. **Individual** only for a personal owner. Moving later = new billing account + *Change billing* on the project (no downtime), but the trial credit doesn't move |
 | Why it's $0 | *"You will not be billed for any Google Cloud usage during your Free Trial"*, no automatic charges. Free Tier applies during the trial and doesn't use the credit. Credit exhausted or day 90 → account closes, resources stop, nothing billed |
 | Never | Click **Activate / Upgrade** before the kill switch exists (it's the only step that allows charges) |
-| Budget | *Billing → Budgets & alerts*: name `<APP>-zero`, **Monthly**, all projects/services, Savings: **untick Promotional credits** (trial credit hides spend), **keep Free tier credits**; specified amount 1 USD (or equivalent), thresholds 50/90/100 % actual + 100 % forecast, email billing admins and users. Amount is in the billing currency (Brazil: R$ 5) |
-| Trial end (decide by day 80) | *Let it close*: resources stop, 30-day grace to upgrade, then deleted ($0). *Keep running*: kill switch first (budget → Pub/Sub topic → function that unlinks billing; needs Project Billing Manager + Browser on the project), then *Activate*. Notifications arrive several times a day and can lag hours, so it caps a runaway, not to exactly $0; unlinking stops all services (free ones too) and may delete resources |
+| Budget | *Billing → Budgets & caps* → **Alerts only**: name `<APP>-zero`, **Monthly**, all projects/services, Savings: **untick Promotional credits** (trial credit hides spend), **keep Free tier credits**; specified amount 1 USD (or equivalent), thresholds 50/90/100 % actual + 100 % forecast, email billing admins and users. Amount is in the billing currency (Brazil: R$ 5) |
+| Cloud Run spend cap | *Billing → Budgets & caps → Create budget → **Spend cap enforcement***: name `<APP>-run-cap`, single project, service **Cloud Run**, monthly (fixed), target **just below the free tier's list-price value** (~US$ 6/month: 180k vCPU-s + 360k GiB-s + 2M requests; Vet Plan: R$ 25). Counts **gross list price before free-tier credits**. When exceeded, new Cloud Run usage (service and jobs) pauses until the 1st of next month or a manual *Lift spend cap*; in-flight requests finish, enforcement isn't instant. Eligible services only: Cloud Run, Cloud Run functions, Gemini API, Vertex AI. Create it after the Cloud Run API is enabled |
+| Trial end (decide by day 80) | *Let it close*: resources stop, 30-day grace to upgrade, then deleted ($0). *Keep running*: confirm the Cloud Run spend cap and the alert budget, switch to a company payment method, then *Activate*. Optional last resort: kill switch (budget → Pub/Sub → function that unlinks billing; needs Project Billing Manager + Browser); it lags hours and unlinking stops all services and may delete resources |
 
 **B. Project and APIs** (Cloud Shell: `apps/backend/deploy/gcp-setup.sh`)
 | Item | Value |
 |---|---|
-| Project | name `<APP>` → note `<PROJECT_ID>` |
+| Project | name `<APP>` → note `<PROJECT_ID>`. Company accounts get an **organization** at signup (*"Criar organização e projeto"*): create the project in it (`gcloud projects create <ID> --name=<APP> --organization=<ORG_ID>`, then `gcloud billing projects link`). Organizations created since 2024-05-03 enforce *secure-by-default* policies (no service-account keys, domain-restricted sharing), so make Cloud Run public with `--no-invoker-iam-check`, not `allUsers` / `--allow-unauthenticated` |
 | APIs | `run`, `cloudbuild`, `artifactregistry`, `secretmanager`, `iam`, `cloudresourcemanager` (`.googleapis.com`) |
 
 **C. Artifact Registry**
@@ -142,7 +144,7 @@ One entry per secret, named `<APP> · <KEY>` (e.g. `vet-plan · DATABASE_URL`). 
 |---|---|
 | `<RUNTIME_SA>` (Cloud Run runs as it) | `roles/secretmanager.secretAccessor` **on `<SECRET>` only** |
 | `<DEPLOYER_SA>` (Cloud Build runs as it) | project: `roles/run.admin`, `roles/artifactregistry.writer`, `roles/logging.logWriter`; on `<RUNTIME_SA>`: `roles/iam.serviceAccountUser` |
-No JSON keys are ever downloaded.
+No JSON keys are ever downloaded. A new service account takes a few seconds to become visible to IAM (`does not exist` right after creation), so the setup script retries IAM bindings for up to a minute.
 
 **E. Secret Manager: one bundled secret** (free: 6 active versions per billing account; disabled versions count, destroyed don't)
 | Item | Value |
@@ -169,7 +171,7 @@ No JSON keys are ever downloaded.
 |---|---|
 | `--region=<GCP_REGION> --service-account=<RUNTIME_SA>@…` | same region and account |
 | `--set-secrets=/secrets/backend.env=<SECRET>:latest --set-env-vars=NODE_ENV=production,ENV_FILE=/secrets/backend.env` | same |
-| `--allow-unauthenticated --port=8080 --cpu=1 --memory=512Mi --concurrency=80 --timeout=60` | `--command=node --args=node_modules/typeorm/cli.js,migration:run,-d,dist/config/data-source.js` |
+| `--no-invoker-iam-check --port=8080 --cpu=1 --memory=512Mi --concurrency=80 --timeout=60` | `--command=node --args=node_modules/typeorm/cli.js,migration:run,-d,dist/config/data-source.js` |
 | `--min-instances=0 --max-instances=2 --cpu-throttling --no-cpu-boost` ($0 guardrails) | `--tasks=1 --max-retries=0 --task-timeout=300s --cpu=1 --memory=512Mi --execute-now --wait` |
 | Free: 2M requests, 180k vCPU-s, 360k GiB-s/month (request-based) | Free: 240k vCPU-s, 450k GiB-s/month |
 Also free: Cloud Logging 50 GiB/month, outbound data 1 GiB/month from North America.
@@ -301,13 +303,14 @@ Everything in `<SECRET>` is one file = **one** secret version, whatever the numb
 - [ ] Cloud Run: still `min 0 / max 2`, request-based billing, no CPU boost.
 - [ ] Neon: compute hours on the project dashboard well under 100 CU-h.
 - [ ] Workers AI / Groq: fallback-rate metric (`vetplan_llm_request_duration{outcome}`) not dominated by `rate_limited`.
-- [ ] GCP trial day 80: let it close ($0), or add the kill switch and only then *Activate*.
+- [ ] Cloud Run spend cap present (*Budgets & caps*, status *Configured*); if *Enforced*, find the cause before lifting.
+- [ ] GCP trial day 80: let it close ($0), or confirm the spend cap + alert budget, switch to a company card, then *Activate*.
 
 ---
 
 ## 9. Sources (verified 2026-11-01)
 - Neon: [pricing](https://neon.com/pricing) · [regions](https://neon.com/docs/introduction/regions) · [connection pooling](https://neon.com/docs/connect/connection-pooling) · [roles](https://neon.com/docs/manage/roles)
-- GCP: [Cloud Run pricing & tiers](https://cloud.google.com/run/pricing) · [Cloud Build pricing](https://cloud.google.com/build/pricing) · [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing) · [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing) · [Free Program (trial + free tier)](https://docs.cloud.google.com/free/docs/free-cloud-features) · [Budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Budget Pub/Sub notifications](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications) · [Disable billing with notifications (kill switch)](https://docs.cloud.google.com/billing/docs/how-to/disable-billing-with-notifications) · [Unlink / change a project's billing: roles](https://docs.cloud.google.com/billing/docs/how-to/modify-project) · [Free trial FAQ (personal card for a company)](https://cloud.google.com/signup-faqs) · [Payments profile types](https://support.google.com/paymentscenter/answer/9028746) · [Brazil VAT (local contracting)](https://docs.cloud.google.com/billing/docs/resources/vat-overview) · [Payment methods + one-time prepayment](https://docs.cloud.google.com/billing/docs/how-to/payment-methods) · [Prepay vs postpay (refund rules)](https://docs.cloud.google.com/billing/docs/in-product-billing-setup)
+- GCP: [Cloud Run pricing & tiers](https://cloud.google.com/run/pricing) · [Cloud Build pricing](https://cloud.google.com/build/pricing) · [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing) · [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing) · [Free Program (trial + free tier)](https://docs.cloud.google.com/free/docs/free-cloud-features) · [Budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Budget Pub/Sub notifications](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications) · [Disable billing with notifications (kill switch)](https://docs.cloud.google.com/billing/docs/how-to/disable-billing-with-notifications) · [Unlink / change a project's billing: roles](https://docs.cloud.google.com/billing/docs/how-to/modify-project) · [Free trial FAQ (personal card for a company)](https://cloud.google.com/signup-faqs) · [Payments profile types](https://support.google.com/paymentscenter/answer/9028746) · [Brazil VAT (local contracting)](https://docs.cloud.google.com/billing/docs/resources/vat-overview) · [Payment methods + one-time prepayment](https://docs.cloud.google.com/billing/docs/how-to/payment-methods) · [Spend cap budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets-spend-caps) · [Secure-by-default organizations](https://docs.cloud.google.com/resource-manager/docs/secure-by-default-organizations) · [Cloud Run public access (invoker IAM check)](https://docs.cloud.google.com/run/docs/securing/managing-access) · [Billing release notes (spend caps GA 2026-10-13)](https://docs.cloud.google.com/billing/docs/release-notes) · [Prepay vs postpay (refund rules)](https://docs.cloud.google.com/billing/docs/in-product-billing-setup)
 - Cloudflare: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) · [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) · [Workers AI data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/) · [OpenAI-compatible API](https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/)
 - GitHub: [Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 - Upstash: [Redis pricing](https://upstash.com/pricing/redis) · Groq: [rate limits](https://console.groq.com/docs/rate-limits), [your data](https://console.groq.com/docs/your-data)

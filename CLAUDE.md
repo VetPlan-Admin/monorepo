@@ -52,7 +52,7 @@
 
 ## 5. Security Restrictions
 - NEVER commit secrets or `.env` files. Document new keys in `.env.example`. Production configuration lives only in the Secret Manager secret `vet-plan-backend-env` (`docs/DEPLOYMENT.md`); never put secrets in `cloudbuild.yaml`, Dockerfiles or Cloud Run plain env vars.
-- Keep the free-tier guardrails in `apps/backend/cloudbuild.yaml` (min 0 / max 2 instances, request-based billing, no CPU boost). Changing them requires reviewing `docs/DEPLOYMENT.md` and the budget.
+- Keep the free-tier guardrails in `apps/backend/cloudbuild.yaml` (min 0 / max 2 instances, request-based billing, no CPU boost) and the Cloud Run spend cap budget `vet-plan-run-cap`. Changing them requires reviewing `docs/DEPLOYMENT.md` and the budget.
 - ALWAYS maintain strict `.gitignore` rules for `node_modules`, `.pnpm-store`, build outputs, and `.env`.
 
 ## 6. Monorepo Directory Structure & File Blueprint
